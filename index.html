@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dungeon Crawler</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <main>
+    <section id="menu" aria-labelledby="menu-title">
+      <div class="menu-cover">
+        <canvas id="doorway" width="208" height="232" aria-hidden="true"></canvas>
+        <h1 id="menu-title">Dungeon<br>Crawler</h1>
+        <nav aria-label="Menu principal">
+          <button type="button" id="start">Iniciar</button>
+          <button type="button" id="help">Como jogar</button>
+          <button type="button" id="quit">Sair</button>
+        </nav>
+      </div>
+      <div class="menu-build">
+        <table class="titles">
+          <caption>Títulos</caption>
+          <tbody><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></tbody>
+        </table>
+        <section class="customize" aria-labelledby="character-title">
+          <h2 id="character-title">Personagem</h2>
+          <div class="display-case"><canvas id="preview" width="28" height="34" role="img" aria-label="Prévia do personagem"></canvas></div>
+          <fieldset><legend>Cabeça</legend>
+            <label><input type="radio" name="head" value="human" checked><span>Humana</span></label>
+            <label><input type="radio" name="head" value="goblin"><span>Goblin</span></label>
+          </fieldset>
+          <fieldset><legend>Corpo</legend>
+            <label><input type="radio" name="body" value="cloak" checked><span>Capa</span></label>
+            <label><input type="radio" name="body" value="armor"><span>Armadura</span></label>
+          </fieldset>
+        </section>
+      </div>
+    </section>
+    <dialog id="instructions" aria-labelledby="help-title">
+      <h2 id="help-title">Como jogar</h2>
+      <p>Use <kbd>WASD</kbd> ou as <kbd>setas</kbd> para andar. Aperte <kbd>Espaço</kbd> para atacar na direção do movimento.</p>
+      <p>Quando o inimigo levantar a lança, recue. Você começa com três pontos de vida.</p>
+      <p>Explore as salas e pise na escada para descer. Você pode deixar inimigos para trás.</p>
+      <form method="dialog"><button>Voltar</button></form>
+    </dialog>
+    <section id="exit-screen" class="card" hidden>
+      <h1>Jogo encerrado</h1>
+      <button type="button" id="reopen">Voltar ao menu</button>
+    </section>
+    <div id="game" hidden>
+    <header>
+      <h1>Dungeon Crawler</h1>
+      <div class="run-status">
+        <span id="health" role="status" aria-atomic="true"></span>
+        <span class="depth" role="status"><i aria-hidden="true">↓</i> Andar <span id="floor-number">01</span></span>
+      </div>
+    </header>
+    <section class="frame" aria-label="Sala da masmorra">
+      <canvas id="room" tabindex="-1" width="896" height="512" aria-label="Masmorra vista de cima. Explore as salas conectadas e encontre a escada para o próximo andar.">Este jogo precisa de um navegador com suporte a Canvas.</canvas>
+      <div id="end" hidden>
+        <div class="card">
+          <span class="rune" aria-hidden="true">◇</span>
+          <h2 id="end-title">Fim da partida</h2>
+          <button type="button" id="reset">Jogar novamente</button>
+          <button type="button" id="back-menu">Menu principal</button>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <span><b class="compass" aria-hidden="true">◇</b> Alcance a escada</span>
+      <span class="controls"><kbd>WASD</kbd> ou <kbd>↑ ← ↓ →</kbd> para mover · <kbd>Espaço</kbd> para atacar</span>
+    </footer>
+    </div>
+  </main>
+</body>
+</html>
