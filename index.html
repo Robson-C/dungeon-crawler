@@ -3,39 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dungeon Crawler</title>
+  <title>Chaos Crawl</title>
   <link rel="stylesheet" href="style.css">
+  <script src="inventory.js" defer></script>
+  <script src="gameplay-art.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
   <main>
     <section id="menu" aria-labelledby="menu-title">
       <div class="menu-cover">
-        <canvas id="doorway" width="208" height="232" aria-hidden="true"></canvas>
-        <h1 id="menu-title">Dungeon<br>Crawler</h1>
+        <img class="menu-art" src="assets/chaos-crawl-menu.png" width="1659" height="948" alt="" draggable="false">
+        <h1 id="menu-title">Chaos Crawl</h1>
         <nav aria-label="Menu principal">
-          <button type="button" id="start">Iniciar</button>
-          <button type="button" id="help">Como jogar</button>
-          <button type="button" id="quit">Sair</button>
+          <button type="button" id="play">Jogar</button>
+          <button type="button" id="help">Instruções</button>
         </nav>
       </div>
-      <div class="menu-build">
-        <table class="titles">
-          <caption>Títulos</caption>
-          <tbody><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></tbody>
-        </table>
-        <section class="customize" aria-labelledby="character-title">
-          <h2 id="character-title">Personagem</h2>
-          <div class="display-case"><canvas id="preview" width="28" height="34" role="img" aria-label="Prévia do personagem"></canvas></div>
-          <fieldset><legend>Cabeça</legend>
-            <label><input type="radio" name="head" value="human" checked><span>Humana</span></label>
-            <label><input type="radio" name="head" value="goblin"><span>Goblin</span></label>
-          </fieldset>
-          <fieldset><legend>Corpo</legend>
-            <label><input type="radio" name="body" value="cloak" checked><span>Capa</span></label>
-            <label><input type="radio" name="body" value="armor"><span>Armadura</span></label>
-          </fieldset>
-        </section>
+    </section>
+    <section id="character-create" aria-labelledby="character-title" hidden>
+      <img class="creation-art" src="assets/chaos-crawl-creation.png" width="1659" height="948" alt="" draggable="false">
+      <h2 id="character-title" class="creation-accessible" tabindex="-1">Criar personagem</h2>
+      <dl class="creation-accessible" aria-label="Atributos iniciais">
+        <dt>Vida</dt><dd id="creation-health"></dd>
+        <dt>Magia</dt><dd>0</dd>
+        <dt>Armadura</dt><dd>0</dd>
+        <dt>Força</dt><dd>0</dd>
+        <dt>Vigor</dt><dd>0</dd>
+        <dt>Vontade</dt><dd>0</dd>
+        <dt>Intelecto</dt><dd>0</dd>
+        <dt>Resistência a fogo</dt><dd>0</dd>
+        <dt>Resistência a gelo</dt><dd>0</dd>
+        <dt>Resistência a veneno</dt><dd>0</dd>
+        <dt>Resistência elétrica</dt><dd>0</dd>
+      </dl>
+      <p class="creation-accessible">Títulos: 12 espaços bloqueados.</p>
+      <div class="customize">
+        <div id="preview" data-appearance="human-cloak" role="img" aria-label="Prévia do personagem"></div>
+        <fieldset class="creation-head"><legend class="creation-accessible">Cabeça</legend>
+          <label><input type="radio" name="head" value="human" checked><span>Humana</span></label>
+          <label><input type="radio" name="head" value="goblin"><span>Goblin</span></label>
+        </fieldset>
+        <fieldset class="creation-body"><legend class="creation-accessible">Corpo</legend>
+          <label><input type="radio" name="body" value="cloak" checked><span>Capa</span></label>
+          <label><input type="radio" name="body" value="armor"><span>Armadura</span></label>
+        </fieldset>
+      </div>
+      <div class="character-actions">
+        <button type="button" id="back-character">Voltar</button>
+        <button type="button" id="start">Entrar na masmorra</button>
       </div>
     </section>
     <dialog id="instructions" aria-labelledby="help-title">
@@ -46,20 +62,16 @@
       <p>Aperte <kbd>I</kbd> para abrir ou fechar o inventário. Os inimigos podem atacar enquanto você consulta a mochila.</p>
       <form method="dialog"><button>Voltar</button></form>
     </dialog>
-    <section id="exit-screen" class="card" hidden>
-      <h1>Jogo encerrado</h1>
-      <button type="button" id="reopen">Voltar ao menu</button>
-    </section>
     <div id="game" hidden>
     <header>
-      <h1>Dungeon Crawler</h1>
+      <h1>Chaos Crawl</h1>
       <div class="run-status">
         <span id="health" role="status" aria-atomic="true"></span>
         <span class="depth" role="status"><i aria-hidden="true">↓</i> Andar <span id="floor-number">01</span></span>
       </div>
     </header>
     <section class="frame" aria-label="Sala da masmorra">
-      <canvas id="room" tabindex="-1" width="896" height="512" aria-label="Masmorra vista de cima. Explore as salas conectadas e encontre a escada para o próximo andar.">Este jogo precisa de um navegador com suporte a Canvas.</canvas>
+      <canvas id="room" tabindex="-1" width="1792" height="1024" aria-label="Masmorra vista de cima. Explore as salas conectadas e encontre a escada para o próximo andar.">Este jogo precisa de um navegador com suporte a Canvas.</canvas>
       <div id="end" hidden>
         <div class="card">
           <span class="rune" aria-hidden="true">◇</span>
@@ -72,21 +84,22 @@
       <div class="inventory-header">
         <h2 id="inventory-title" tabindex="-1">Inventário</h2>
         <form method="dialog"><button type="submit">Fechar</button></form>
+        <p class="inventory-feedback" id="inventory-feedback" role="status"></p>
       </div>
       <div class="inventory-content">
         <div class="inventory-character">
           <section class="character-equipment" aria-labelledby="equipment-title">
             <h3 id="equipment-title">Equipamento</h3>
             <div class="equipment-layout">
-              <div class="equipment-slot">Elmo</div>
-              <div class="equipment-slot">Armadura</div>
+              <button type="button" class="equipment-slot" data-equipment="head">Elmo</button>
+              <button type="button" class="equipment-slot" data-equipment="weapon">Arma</button>
               <div class="equipment-preview">
                 <canvas id="equipped-character" width="28" height="34" role="img" aria-label="Personagem"></canvas>
               </div>
-              <div class="equipment-slot">Arma</div>
-              <div class="equipment-slot">Escudo</div>
-              <div class="equipment-slot">Botas</div>
-              <div class="equipment-slot">Anel</div>
+              <button type="button" class="equipment-slot" data-equipment="armor">Armadura</button>
+              <button type="button" class="equipment-slot" data-equipment="necklace">Colar</button>
+              <button type="button" class="equipment-slot" data-equipment="boots">Botas</button>
+              <button type="button" class="equipment-slot" data-equipment="ring">Anel</button>
             </div>
           </section>
           <div class="character-status">
@@ -115,17 +128,14 @@
           </div>
         </div>
         <div class="inventory-storage">
-          <section class="wealth" aria-labelledby="wealth-title">
-            <h3 id="wealth-title">Riqueza</h3>
-            <p><strong data-stat="manaPearls"></strong> Pérolas de Mana</p>
-          </section>
+          <p class="wealth"><strong data-stat="manaPearls"></strong> Pérolas de Mana</p>
           <div class="sell-area" id="sell-dropzone">
             <strong>Vender itens</strong>
             <span>Arraste o item aqui</span>
           </div>
           <section aria-labelledby="bag-title">
             <h3 id="bag-title">Mochila</h3>
-            <div id="bag-slots" role="img" aria-label="Mochila com 24 espaços livres"></div>
+            <div id="bag-slots" role="group" aria-labelledby="bag-title"></div>
           </section>
         </div>
       </div>

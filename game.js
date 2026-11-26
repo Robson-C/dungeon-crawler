@@ -259,12 +259,13 @@ function move(player, dx, dy, seconds) {
 }
 
 const menu = document.getElementById("menu");
+const characterCreate = document.getElementById("character-create");
 const game = document.getElementById("game");
 const instructions = document.getElementById("instructions");
-const exitScreen = document.getElementById("exit-screen");
-const start = document.getElementById("start");
+const play = document.getElementById("play");
 const canvas = document.getElementById("room");
 const ctx = canvas.getContext("2d");
+const gameplayArt = createGameplayArt();
 const zoom = 1.5;
 const view = { width: 448 / zoom, height: 256 / zoom };
 const pixelsPerUnit = canvas.width / view.width;
@@ -272,8 +273,7 @@ const end = document.getElementById("end");
 const healthDisplay = document.getElementById("health");
 const inventoryHealth = document.getElementById("inventory-health");
 const inventory = document.getElementById("inventory");
-const bagSlots = document.getElementById("bag-slots");
-for (let i = 0; i < 24; i++) bagSlots.append(document.createElement("span"));
+const inventoryView = createInventoryView(inventory);
 const reset = document.getElementById("reset");
 const keys = new Set();
 const directions = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
@@ -282,6 +282,7 @@ let previous = null;
 let gameTime = 0;
 let facing = 1;
 let stride = 0;
+let playerMoved = false;
 let lastDirection = 0;
 let swing = null;
 let pendingSwingDirection = null;
@@ -311,6 +312,7 @@ function isThinWall(tiles, id, col, row) {
 }
 
 function drawRoom(now, left, top) {
+  if (gameplayArt.room(ctx, floor, view, left, top, now, columns, rows, tileSize)) return;
   const stones = ["#3b4849", "#3f4c4c", "#3c4949", "#414c4b", "#3b4749"];
   const { tiles, stairs } = floor;
   rect(left, top, view.width, view.height, "#131b1d");
@@ -425,8 +427,8 @@ hurtSprite.width = adventurer.width;
 hurtSprite.height = adventurer.height;
 const hurtCtx = hurtSprite.getContext("2d");
 function updateCharacter() {
-  const head = menu.querySelector('[name="head"]:checked');
-  const body = menu.querySelector('[name="body"]:checked');
+  const head = characterCreate.querySelector('[name="head"]:checked');
+  const body = characterCreate.querySelector('[name="body"]:checked');
   const rows = (head.value === "human" ? humanHead : goblinHead)
     .concat(body.value === "cloak" ? cloakedBody : armoredBody);
   sprite.clearRect(0, 0, adventurer.width, adventurer.height);
@@ -443,9 +445,9 @@ function updateCharacter() {
   hurtCtx.fillStyle = "#ffe8cc";
   hurtCtx.fillRect(0, 0, hurtSprite.width, hurtSprite.height);
   const preview = document.getElementById("preview");
-  const portrait = preview.getContext("2d");
-  portrait.clearRect(0, 0, preview.width, preview.height);
-  portrait.drawImage(adventurer, 0, 0);
+  preview.dataset.appearance = `${head.value}-${body.value}`;
+  const initialHealth = `${playerMaxHealth}/${playerMaxHealth}`;
+  document.getElementById("creation-health").textContent = initialHealth;
   const appearance = `Cabeça ${head.labels[0].textContent.trim()}, corpo com ${body.labels[0].textContent.trim()}`;
   adventurer.setAttribute("aria-label", appearance);
   preview.setAttribute("aria-label", appearance);
@@ -462,9 +464,23 @@ function bladePose(x, y, elapsed) {
   return { phase, sweep, angle, reach, cx, cy };
 }
 
-// Sample integer pixels so the blade and its trail match the character sprite.
+// Keep the original sampled trail for the remaining pixel sprites.
 function drawSwing(x, y, elapsed) {
   const { phase, sweep, angle, reach, cx, cy } = bladePose(x, y, elapsed);
+  if (document.getElementById("preview").dataset.appearance === "human-cloak") {
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (phase > .15 && phase < .86) {
+      ctx.beginPath();
+      ctx.arc(0, 0, reach, angle - Math.min(.6, sweep * 2.16), angle);
+      ctx.strokeStyle = "#ffdfa569";
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    }
+    ctx.restore();
+    gameplayArt.weapon(ctx, cx, cy, angle, reach, false, true);
+    return;
+  }
 
   function mark(distance, heading, size, color) {
     rect(Math.round(cx + distance * Math.cos(heading)),
@@ -555,6 +571,19 @@ function drawTarget(target, now) {
   if (target.health === 0) return;
   const x = Math.round(target.x), y = Math.round(target.y);
   const hit = now < target.flashUntil;
+  const illustratedPose = target.state === "windup" ? 3
+    : target.state === "chase" ? 1 + Math.floor(now / 140) % 2 : 0;
+  const illustratedFacing = Math.cos(target.direction) < 0 ? -1 : 1;
+  if (gameplayArt.actor(ctx, 1, illustratedPose, target.x, target.y, illustratedFacing, hit)) {
+    const thrusting = target.state === "recovery" && target.remaining > enemyRules.recovery - .15;
+    const ready = target.state === "windup";
+    gameplayArt.weapon(ctx, x, y - 8, ready ? -Math.PI / 2 : target.direction,
+      thrusting ? enemyRules.reach : ready ? 14 : 9, ready);
+    for (let i = 0; i < targetMaxHealth; i++) {
+      rect(x - 7 + i * 5, y - 25, 4, 1.2, i < target.health ? "#f1ce85" : "#202b2d");
+    }
+    return;
+  }
   rect(x - 8, y - 1, 16, 3, "#202c2dbb");
   const sign = Math.cos(target.direction) < 0 ? -1 : 1;
   const walking = target.state === "chase" ? Math.floor(now / 110) % 2 : 0;
@@ -617,12 +646,48 @@ function checkSwordHit(now) {
 
 function drawPlayer(now) {
   const x = Math.round(player.x), y = Math.round(player.y);
+  const flashing = now < player.flashUntil && Math.floor((player.flashUntil - now) / 60) % 2 === 1;
+  if (document.getElementById("preview").dataset.appearance === "human-cloak") {
+    if (swing) {
+      const blade = bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
+      const sign = Math.abs(swing.direction) > Math.PI / 2 ? -1 : 1;
+      if (gameplayArt.slash(ctx, player.x, player.y, sign, playerMoved, flashing, blade,
+          swing.direction)) return;
+    }
+    const heading = Math.abs(lastDirection);
+    if (!swing && heading > 0 && heading < Math.PI) {
+      const diagonalFacing = heading === Math.PI / 2 ? 0 : facing;
+      if (gameplayArt.directional(ctx, lastDirection < 0, playerMoved ? stride : 0,
+          player.x, player.y, flashing, diagonalFacing)) return;
+    }
+    if (!swing && playerMoved && stride > 0 &&
+        gameplayArt.run(ctx, stride, player.x, player.y, facing, flashing)) return;
+    const pose = swing ? 3 : 0;
+    if (gameplayArt.actor(ctx, 0, pose, player.x, player.y, facing, flashing)) {
+      if (swing) drawSwing(x, y + Math.floor(stride / 6) % 2, now - swing.started);
+      else {
+        // The running sword is in the near hand. Register its idle grip to that
+        // fist (188,260) using the same foot anchor and scale as the idle sprite.
+        const idle = gameplayActorFrames[0][0];
+        const scale = 21 / gameplayActorHeights[0];
+        const handX = player.x + facing * (188 - idle.x - idle.anchorX) * scale;
+        const handY = player.y + (260 - idle.y - idle.h) * scale;
+        // The near elbow is at (169,197). Turn the forearm a quarter turn.
+        const angle = Math.atan2(169 - 188, facing * (260 - 197));
+        const gripOffset = 2 + 8 * .145;
+        const originX = handX - gripOffset * Math.cos(angle);
+        const originY = handY - gripOffset * Math.sin(angle);
+        gameplayArt.weapon(ctx, originX, originY, angle, 9, false, true);
+      }
+      return;
+    }
+  }
   rect(x - 8, y - 2, 16, 4, "#202c2dbb");
   const bob = Math.floor(stride / 6) % 2;
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   ctx.translate(x, y);
   ctx.scale(facing, 1);
-  const flashing = now < player.flashUntil && Math.floor((player.flashUntil - now) / 60) % 2 === 1;
   ctx.drawImage(flashing ? hurtSprite : adventurer, -7, -17 + bob * 0.5, 14, 17);
   if (!swing) {
     const handY = -6 + bob * 0.5;
@@ -651,6 +716,7 @@ function frame(timestamp) {
     if (dx) facing = dx;
     const { x, y } = player;
     move(player, dx, dy, dt);
+    playerMoved = player.x !== x || player.y !== y;
     stride = dx || dy ? stride + Math.hypot(player.x - x, player.y - y) : 0;
     const { stairs } = floor;
     if (player.x >= stairs.left && player.x <= stairs.right &&
@@ -666,10 +732,11 @@ function frame(timestamp) {
               x: Math.round(player.x), y: Math.round(player.y) + Math.floor(stride / 6) % 2 };
     pendingSwingDirection = null;
   }
-  const left = Math.max(0, Math.min(world.width - view.width, Math.round(player.x - view.width / 2)));
-  const top = Math.max(0, Math.min(world.height - view.height, Math.round(player.y - view.height / 2)));
+  const left = Math.max(0, Math.min(world.width - view.width, player.x - view.width / 2));
+  const top = Math.max(0, Math.min(world.height - view.height, player.y - view.height / 2));
   ctx.setTransform(pixelsPerUnit, 0, 0, pixelsPerUnit, -left * pixelsPerUnit, -top * pixelsPerUnit);
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   drawRoom(now, left, top);
   const actors = [player, ...floor.enemies].sort((a, b) => a.y - b.y);
   for (const actor of actors) {
@@ -735,6 +802,7 @@ window.addEventListener("keydown", event => {
     return;
   }
   if (event.code === "Space") {
+    if (inventory.open && event.target?.closest?.("#inventory button")) return;
     event.preventDefault();
     if (!event.repeat && pendingSwingDirection === null) {
       const dx = held("KeyD", "ArrowRight") - held("KeyA", "ArrowLeft");
@@ -763,7 +831,7 @@ function enterFloor(number) {
 }
 
 function startRun() {
-  menu.hidden = true;
+  characterCreate.hidden = true;
   game.hidden = false;
   runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
   player = {
@@ -771,6 +839,7 @@ function startRun() {
     magic: 0, armor: 0, strength: 0, stamina: 0, willpower: 0, intellect: 0,
     fireResistance: 0, iceResistance: 0, poisonResistance: 0, lightningResistance: 0
   };
+  inventoryView.reset();
   gameTime = 0;
   keys.clear();
   enterFloor(1);
@@ -782,75 +851,20 @@ function startRun() {
 
 function showMenu() {
   game.hidden = true;
-  exitScreen.hidden = true;
+  characterCreate.hidden = true;
   menu.hidden = false;
-  start.focus();
+  play.focus();
 }
 
-menu.addEventListener("change", updateCharacter);
-start.addEventListener("click", startRun);
+play.addEventListener("click", () => {
+  menu.hidden = true;
+  characterCreate.hidden = false;
+  document.getElementById("character-title").focus();
+});
+characterCreate.addEventListener("change", updateCharacter);
+document.getElementById("back-character").addEventListener("click", showMenu);
+document.getElementById("start").addEventListener("click", startRun);
 reset.addEventListener("click", startRun);
 document.getElementById("back-menu").addEventListener("click", showMenu);
 document.getElementById("help").addEventListener("click", () => instructions.showModal());
-document.getElementById("quit").addEventListener("click", () => {
-  menu.hidden = true;
-  exitScreen.hidden = false;
-  document.getElementById("reopen").focus();
-  window.close();
-});
-document.getElementById("reopen").addEventListener("click", showMenu);
 updateCharacter();
-
-function drawDoorway() {
-  const cover = document.getElementById("doorway");
-  const ink = cover.getContext("2d");
-  function block(x, y, w, h, color) {
-    ink.fillStyle = color;
-    ink.fillRect(x, y, w, h);
-  }
-  const stone = ["#25312f", "#2a3735", "#303c38", "#283530", "#323b34"];
-  block(0, 0, 208, 232, "#212c29");
-  for (let row = 0; row < 20; row++) {
-    for (let col = -1; col < 10; col++) {
-      const x = col * 27 + (row % 2) * 13, y = row * 12;
-      const n = grain(col + 1, row);
-      block(x, y, 26, 11, stone[n % stone.length]);
-      block(x + 2, y, 22, 1, "#38413a");
-    }
-  }
-  // Stepped stone arch, with successive ribs receding towards the dark passage.
-  const center = 115, sill = 149;
-  for (let rib = 0; rib < 4; rib++) {
-    const width = 40 - rib * 7, crown = 57 + rib * 10;
-    for (let y = crown; y < sill; y += 3) {
-      const height = Math.max(0, 1 - (y - crown + 1) / width);
-      const half = Math.max(3, Math.floor(width * Math.sqrt(1 - height * height)));
-      block(center - half, y, half * 2, 3, ["#655e4a","#393e36","#252d29","#111a19"][rib]);
-      if (rib === 0 && (y - crown) % 9 === 0) {
-        block(center - half, y, 7, 1, "#888064");
-        block(center + half - 7, y, 7, 1, "#888064");
-      }
-    }
-  }
-  for (let i = 0; i < 10; i++) {
-    const w = 12 + i * i, y = 113 + i * 3 + Math.floor(i * i / 4);
-    block(center - w / 2, y, w, 3 + i, "#202823");
-    block(center - w / 2, y, w, 1 + Math.floor(i / 5), "#746b52");
-  }
-  for (const x of [62, 167]) {
-    const glow = ink.createRadialGradient(x, 106, 1, x, 106, 29);
-    glow.addColorStop(0, "#eaa64e80");
-    glow.addColorStop(1, "#c8934200");
-    block(x - 29, 77, 58, 58, glow);
-    block(x - 1, 109, 3, 9, "#69503c");
-    block(x - 3, 108, 7, 4, "#a87e4e");
-    block(x - 2, 103, 5, 6, "#db843f");
-    block(x, 100, 2, 8, "#f6d392");
-  }
-  const shade = ink.createLinearGradient(0, 0, 0, 232);
-  shade.addColorStop(0, "#0d1718ae");
-  shade.addColorStop(0.42, "#14202008");
-  shade.addColorStop(1, "#101919f5");
-  block(0, 0, 208, 232, shade);
-}
-drawDoorway();
