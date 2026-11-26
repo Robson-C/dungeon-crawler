@@ -10,13 +10,14 @@ h1 { font-size: clamp(26px, 4vw, 46px); letter-spacing: -.04em; }
 .depth i { color: #edb168; font-style: normal; }
 .run-status { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
 #health { color: #e8aa92; font: 13px "Courier New", monospace; }
-.frame { position: relative; padding: 5px; border: 1px solid #746649; background: #121918; box-shadow: 0 12px 36px #0006; }
+.frame { --hud-inset: 8px; --hud-slot-height: 19px; position: relative; container-type: inline-size; padding: 5px; border: 1px solid #746649; background: #121918; box-shadow: 0 12px 36px #0006; }
+#room:focus { outline: none; }
 canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
 footer { margin-top: 16px; color: #c1c7bc; font-size: 14px; flex-wrap: wrap; }
 .compass { margin-right: 5px; color: #efb56a; }
 .controls { color: #adb6ae; }
 kbd { font: 12px "Courier New", monospace; color: #d6dace; border: 1px solid #535d54; border-radius: 3px; padding: 2px 5px; }
-#end { position: absolute; inset: 0; display: grid; place-items: center; background: #0b1111bd; }
+#end { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; background: #0b1111bd; }
 #end[hidden] { display: none; }
 .card { min-width: min(255px, 90%); padding: 18px 24px 24px; text-align: center; border: 1px solid #98835a; background: #1c2522; }
 .rune { color: #e9ae62; font-size: 24px; }
@@ -50,8 +51,104 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 .customize input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
 dialog { max-width: min(390px, 90vw); padding: 25px; color: #eee3cc; background: #1c2522; border: 1px solid #98835a; line-height: 1.5; }
 dialog::backdrop { background: #0b1111ce; }
+#inventory { --hud-height: calc(var(--hud-slot-height) + 8px); position: absolute; inset: var(--hud-inset) 0 calc(var(--hud-height) + 2 * var(--hud-inset)); width: 93%; height: fit-content; max-width: 810px; max-height: calc(100% - var(--hud-height) - 3 * var(--hud-inset)); margin: auto; padding: 0; color: #eee3cc; background: #222c28; line-height: 1.15; box-shadow: 0 3px 14px #0008; }
+.inventory-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; border-bottom: 1px solid #756650; background: #303830; }
+.inventory-header h2 { font-size: 20px; margin: 0; }
+.inventory-header button { padding: 3px 9px; font-size: 12px; background: transparent; border: 1px solid #81765e; color: #eee3cc; }
+.inventory-content { display: grid; grid-template-columns: minmax(0, 35fr) minmax(0, 65fr); }
+.inventory-character, .inventory-storage { padding: clamp(5px, 1cqw, 12px); }
+.inventory-content h3 { margin: 0 0 4px; font: 500 16px Georgia, serif; color: #e2d2b1; }
+.equipment-layout { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 3px; }
+.equipment-slot { min-width: 0; display: grid; place-items: end center; min-height: 22px; padding: 2px; border: 1px solid #546052; background: #18221d; font-size: 11px; color: #c5c9ba; }
+.equipment-preview { grid-area: 1 / 2 / span 3 / span 1; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 70%, #49584d, #222e29 75%); }
+#equipped-character { width: min(54px, 95%); }
+.character-status { margin-top: 5px; font-size: 13px; }
+.character-status dl, .character-status dd, #inventory-spells, #no-spells { margin: 0; }
+.character-status dl div { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.character-status dd { font-variant-numeric: tabular-nums; }
+.progression { display: flex; gap: 12px; color: #d9c6a5; padding-bottom: 4px; }
+.stat-list > div { padding: 1px 4px; border-bottom: 1px solid #3a463e; }
+.stat-list abbr { display: none; text-decoration: none; }
+.fire { background: #513229; }
+.ice { background: #2d4350; }
+.poison { background: #334831; }
+.lightning { background: #49472a; }
+#inventory-health { color: #efb29a; }
+.character-status h3 { display: inline; font: inherit; }
+#inventory-spells { display: inline; padding: 0; list-style: none; }
+#no-spells { display: inline; font-size: inherit; color: #bac0ac; }
+.inventory-storage { display: grid; grid-template-rows: auto auto minmax(0,1fr); row-gap: 5px; border-left: 1px solid #596154; }
+.wealth, .sell-area { width: 53%; justify-self: end; text-align: center; }
+.wealth p { margin: 0; font-size: 13px; color: #e5c995; }
+.sell-area { display: grid; place-content: center; gap: 4px; min-height: 53px; padding: 6px; border: 1px dashed #a2946c; background: #151d19; color: #e4d5b8; font-size: 12px; }
+.sell-area strong { color: #f2d298; }
+.inventory-storage > section:last-child { display: flex; flex-direction: column; }
+#bag-slots { flex: 1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: repeat(4, 1fr); gap: 3px; }
+#bag-slots span { background: #19221f; border: 1px solid #606959; box-shadow: inset 1px 2px 2px #111815; }
+.ability-bar { position: absolute; inset-inline: 0; bottom: var(--hud-inset); display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; width: min(180px, 45%); margin-inline: auto; padding: 3px; border: 1px solid #736650; background: #18201d; }
+.ability-bar span { height: var(--hud-slot-height); border: 1px solid #535d51; background: #252d29; }
 #back-menu { background: transparent; color: #dccdb3; }
 #exit-screen button { margin-top: 20px; }
+@container (max-width: 750px) {
+  #inventory, .ability-bar { --hud-inset: 6px; --hud-slot-height: 15px; }
+  .inventory-header { padding: 3px 8px; }
+  .inventory-header h2 { font-size: 17px; }
+  .inventory-content h3 { font-size: 14px; }
+  .inventory-character, .inventory-storage { padding-block: 5px; }
+  .equipment-layout { gap: 2px; }
+  .equipment-slot { min-height: 17px; padding: 1px; }
+  #equipped-character { width: min(39px, 95%); }
+  .character-status { font-size: 11px; line-height: 1.15; margin-top: 3px; }
+  .character-status h3 { font-size: inherit; }
+  .stat-list > div { padding-block: 0; border-bottom: 0; }
+}
+@container (max-width: 575px) {
+  #inventory, .ability-bar { --hud-inset: 4px; --hud-slot-height: 12px; }
+  #inventory { width: calc(100% - 12px); }
+  .inventory-header { padding: 1px 5px; }
+  .inventory-header h2 { font-size: 13px; }
+  .inventory-header button { font-size: 10px; line-height: 14px; padding: 0 5px; }
+  .inventory-content { grid-template: "equipment storage" "status status" / minmax(0, 40fr) minmax(0, 60fr); }
+  .inventory-character { display: contents; }
+  .character-equipment { grid-area: equipment; padding: 3px; }
+  .inventory-content h3 { font-size: 11px; margin-bottom: 2px; }
+  .equipment-layout { gap: 1px; }
+  .equipment-slot { min-height: 0; padding: 0; place-items: center; font-size: 10px; letter-spacing: -.03em; }
+  #equipped-character { width: min(28px, 95%); }
+  .character-status { grid-area: status; display: grid; grid-template: "progression spells" "stats stats" / 1fr auto; margin: 0; padding: 2px 3px; border-top: 1px solid #596154; font-size: 10px; line-height: 1.1; }
+  .character-status h3 { font-size: inherit; }
+  .progression { grid-area: progression; padding-bottom: 2px; }
+  .character-spells { grid-area: spells; }
+  .stat-list { grid-area: stats; display: grid; grid-auto-flow: column; grid-template: repeat(4, auto) / minmax(0, .8fr) minmax(0, 1.12fr) minmax(0, 1.08fr); column-gap: 3px; }
+  .stat-list > div { padding-inline: 1px; border-bottom: 0; }
+  .resistance-long { display: none; }
+  .stat-list abbr { display: inline; }
+  .inventory-storage { grid-area: storage; grid-template: "wealth bag" auto "sell bag" 1fr / minmax(0, 1fr) minmax(0, 1.25fr); gap: 2px 4px; padding: 3px; }
+  .wealth { grid-area: wealth; }
+  .wealth p { font-size: 9px; }
+  .sell-area { grid-area: sell; min-height: 0; gap: 1px; padding: 2px; font-size: 9px; }
+  .wealth, .sell-area { width: 100%; }
+  .inventory-storage > section:last-child { grid-area: bag; }
+  #bag-slots { gap: 2px; }
+}
+@container (max-width: 375px) {
+  #inventory, .ability-bar { --hud-inset: 3px; --hud-slot-height: 11px; }
+  #inventory { width: calc(100% - 8px); }
+  .character-equipment > h3, .wealth h3 { display: none; }
+  .equipment-layout { grid-template-columns: minmax(0, 1fr) minmax(0, .7fr) minmax(0, 1.15fr); }
+  .stat-list > div { gap: 2px; }
+  .wealth p { line-height: 1.05; }
+}
+@media (max-width: 375px) {
+  main:has(#game:not([hidden])) { width: 98vw; }
+}
+@media (max-height: 540px) {
+  main:has(#game:not([hidden])) { width: min(920px, 94vw, calc((100dvh - 80px) * 1.75)); margin-block: 4px; }
+  #game > header { padding-bottom: 4px; gap: 4px; }
+  #game > header h1 { font-size: clamp(17px, 4vw, 25px); }
+  #game > footer { margin-top: 4px; gap: 4px; font-size: 11px; }
+  #game > footer kbd { font-size: 10px; padding: 1px 3px; }
+}
 @media (max-width: 640px) {
   .menu-cover { padding: 18px 12px; }
   .menu-build { padding: 17px 10px; }

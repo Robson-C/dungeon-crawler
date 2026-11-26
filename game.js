@@ -270,11 +270,16 @@ const view = { width: 448 / zoom, height: 256 / zoom };
 const pixelsPerUnit = canvas.width / view.width;
 const end = document.getElementById("end");
 const healthDisplay = document.getElementById("health");
+const inventoryHealth = document.getElementById("inventory-health");
+const inventory = document.getElementById("inventory");
+const bagSlots = document.getElementById("bag-slots");
+for (let i = 0; i < 24; i++) bagSlots.append(document.createElement("span"));
 const reset = document.getElementById("reset");
 const keys = new Set();
 const directions = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
 let player;
 let previous = null;
+let gameTime = 0;
 let facing = 1;
 let stride = 0;
 let lastDirection = 0;
@@ -355,9 +360,7 @@ function drawRoom(now, left, top) {
 }
 
 // Each sprite pixel is half a world unit. The feet anchor movement and depth.
-const adventurer = document.createElement("canvas");
-adventurer.width = 28;
-adventurer.height = 34;
+const adventurer = document.getElementById("equipped-character");
 const sprite = adventurer.getContext("2d");
 const dyes = { o: "#22232a", r: "#754036", c: "#b65b3f", h: "#e48d52",
   d: "#513a35", s: "#cd8e63", f: "#ffd3a0", w: "#ffead0",
@@ -443,7 +446,9 @@ function updateCharacter() {
   const portrait = preview.getContext("2d");
   portrait.clearRect(0, 0, preview.width, preview.height);
   portrait.drawImage(adventurer, 0, 0);
-  preview.setAttribute("aria-label", `Cabeça ${head.labels[0].textContent.trim()}, corpo com ${body.labels[0].textContent.trim()}`);
+  const appearance = `Cabeça ${head.labels[0].textContent.trim()}, corpo com ${body.labels[0].textContent.trim()}`;
+  adventurer.setAttribute("aria-label", appearance);
+  preview.setAttribute("aria-label", appearance);
 }
 
 function bladePose(x, y, elapsed) {
@@ -633,10 +638,12 @@ function drawPlayer(now) {
 
 function held(first, second) { return Number(keys.has(first) || keys.has(second)); }
 
-function frame(now) {
+function frame(timestamp) {
   if (game.hidden) return;
-  const dt = previous === null ? 0 : (now - previous) / 1000;
-  previous = now;
+  const dt = previous === null ? 0 : (timestamp - previous) / 1000;
+  previous = timestamp;
+  gameTime += dt * 1000;
+  const now = gameTime;
   if (!player.finished) {
     const dx = held("KeyD", "ArrowRight") - held("KeyA", "ArrowLeft");
     const dy = held("KeyS", "ArrowDown") - held("KeyW", "ArrowUp");
@@ -678,19 +685,55 @@ function clearSwings() {
 }
 
 function showHealth() {
-  healthDisplay.textContent = `Vida ${player.health}/${playerMaxHealth}`;
+  const value = `${player.health}/${playerMaxHealth}`;
+  healthDisplay.textContent = `Vida ${value}`;
+  inventoryHealth.textContent = value;
+}
+
+function showCharacterSheet() {
+  for (const field of inventory.querySelectorAll("[data-stat]")) {
+    field.textContent = player[field.dataset.stat];
+  }
+  const spells = document.getElementById("inventory-spells");
+  spells.replaceChildren(...player.spells.map(name => {
+    const entry = document.createElement("li");
+    entry.textContent = name;
+    return entry;
+  }));
+  document.getElementById("no-spells").hidden = player.spells.length > 0;
 }
 
 function finishRun() {
   player.finished = true;
   keys.clear();
   clearSwings();
+  if (inventory.open) inventory.close();
   end.hidden = false;
   reset.focus();
 }
 
+inventory.addEventListener("close", () => {
+  if (!inventory.open && !game.hidden && !player.finished) canvas.focus();
+});
+
+const sellDropzone = document.getElementById("sell-dropzone");
+sellDropzone.addEventListener("dragover", event => event.preventDefault());
+sellDropzone.addEventListener("drop", event => event.preventDefault());
+
 window.addEventListener("keydown", event => {
   if (game.hidden || player.finished || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.code === "KeyI" || (inventory.open && event.code === "Escape")) {
+    event.preventDefault();
+    if (event.repeat) return;
+    if (inventory.open) {
+      inventory.close();
+    } else {
+      showCharacterSheet();
+      inventory.show();
+      document.getElementById("inventory-title").focus();
+    }
+    return;
+  }
   if (event.code === "Space") {
     event.preventDefault();
     if (!event.repeat && pendingSwingDirection === null) {
@@ -723,7 +766,12 @@ function startRun() {
   menu.hidden = true;
   game.hidden = false;
   runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
-  player = { health: playerMaxHealth, finished: false };
+  player = {
+    health: playerMaxHealth, finished: false, level: 1, xp: 0, manaPearls: 0, spells: [],
+    magic: 0, armor: 0, strength: 0, stamina: 0, willpower: 0, intellect: 0,
+    fireResistance: 0, iceResistance: 0, poisonResistance: 0, lightningResistance: 0
+  };
+  gameTime = 0;
   keys.clear();
   enterFloor(1);
   showHealth();

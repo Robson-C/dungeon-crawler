@@ -43,6 +43,7 @@
       <p>Use <kbd>WASD</kbd> ou as <kbd>setas</kbd> para andar. Aperte <kbd>Espaço</kbd> para atacar na direção do movimento.</p>
       <p>Quando o inimigo levantar a lança, recue. Você começa com três pontos de vida.</p>
       <p>Explore as salas e pise na escada para descer. Você pode deixar inimigos para trás.</p>
+      <p>Aperte <kbd>I</kbd> para abrir ou fechar o inventário. Os inimigos podem atacar enquanto você consulta a mochila.</p>
       <form method="dialog"><button>Voltar</button></form>
     </dialog>
     <section id="exit-screen" class="card" hidden>
@@ -67,10 +68,75 @@
           <button type="button" id="back-menu">Menu principal</button>
         </div>
       </div>
+    <dialog id="inventory" aria-labelledby="inventory-title">
+      <div class="inventory-header">
+        <h2 id="inventory-title" tabindex="-1">Inventário</h2>
+        <form method="dialog"><button type="submit">Fechar</button></form>
+      </div>
+      <div class="inventory-content">
+        <div class="inventory-character">
+          <section class="character-equipment" aria-labelledby="equipment-title">
+            <h3 id="equipment-title">Equipamento</h3>
+            <div class="equipment-layout">
+              <div class="equipment-slot">Elmo</div>
+              <div class="equipment-slot">Armadura</div>
+              <div class="equipment-preview">
+                <canvas id="equipped-character" width="28" height="34" role="img" aria-label="Personagem"></canvas>
+              </div>
+              <div class="equipment-slot">Arma</div>
+              <div class="equipment-slot">Escudo</div>
+              <div class="equipment-slot">Botas</div>
+              <div class="equipment-slot">Anel</div>
+            </div>
+          </section>
+          <div class="character-status">
+            <dl class="progression">
+              <div><dt>Nível</dt><dd data-stat="level"></dd></div>
+              <div><dt>XP</dt><dd data-stat="xp"></dd></div>
+            </dl>
+            <dl class="stat-list">
+              <div><dt>Vida</dt><dd id="inventory-health"></dd></div>
+              <div><dt>Magia</dt><dd data-stat="magic"></dd></div>
+              <div><dt>Armadura</dt><dd data-stat="armor"></dd></div>
+              <div><dt>Força</dt><dd data-stat="strength"></dd></div>
+              <div><dt>Vigor</dt><dd data-stat="stamina"></dd></div>
+              <div><dt>Força de vontade</dt><dd data-stat="willpower"></dd></div>
+              <div><dt>Intelecto</dt><dd data-stat="intellect"></dd></div>
+              <div class="fire"><dt><span class="resistance-long">Resistência a fogo</span><abbr title="Resistência a fogo">Res. fogo</abbr></dt><dd data-stat="fireResistance"></dd></div>
+              <div class="ice"><dt><span class="resistance-long">Resistência a gelo</span><abbr title="Resistência a gelo">Res. gelo</abbr></dt><dd data-stat="iceResistance"></dd></div>
+              <div class="poison"><dt><span class="resistance-long">Resistência a veneno</span><abbr title="Resistência a veneno">Res. veneno</abbr></dt><dd data-stat="poisonResistance"></dd></div>
+              <div class="lightning"><dt><span class="resistance-long">Resistência elétrica</span><abbr title="Resistência elétrica">Res. elétrica</abbr></dt><dd data-stat="lightningResistance"></dd></div>
+            </dl>
+            <div class="character-spells">
+              <h3>Feitiços</h3>
+              <ul id="inventory-spells"></ul>
+              <p id="no-spells">0</p>
+            </div>
+          </div>
+        </div>
+        <div class="inventory-storage">
+          <section class="wealth" aria-labelledby="wealth-title">
+            <h3 id="wealth-title">Riqueza</h3>
+            <p><strong data-stat="manaPearls"></strong> Pérolas de Mana</p>
+          </section>
+          <div class="sell-area" id="sell-dropzone">
+            <strong>Vender itens</strong>
+            <span>Arraste o item aqui</span>
+          </div>
+          <section aria-labelledby="bag-title">
+            <h3 id="bag-title">Mochila</h3>
+            <div id="bag-slots" role="img" aria-label="Mochila com 24 espaços livres"></div>
+          </section>
+        </div>
+      </div>
+    </dialog>
+      <div class="ability-bar" role="img" aria-label="Barra de habilidades com cinco espaços vazios">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
     </section>
     <footer>
       <span><b class="compass" aria-hidden="true">◇</b> Alcance a escada</span>
-      <span class="controls"><kbd>WASD</kbd> ou <kbd>↑ ← ↓ →</kbd> para mover · <kbd>Espaço</kbd> para atacar</span>
+      <span class="controls"><kbd>WASD</kbd> ou <kbd>↑ ← ↓ →</kbd> para mover · <kbd>Espaço</kbd> para atacar · <kbd>I</kbd> Inventário</span>
     </footer>
     </div>
   </main>
