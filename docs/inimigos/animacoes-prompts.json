@@ -1,0 +1,26 @@
+{
+  "base": "Create a production 2D GAME SPRITE SHEET, not a concept poster. Reference image is the exact approved creature identity. Preserve its design, colors, materials, body and painted fantasy game style in EVERY cell. Genuine transparent RGBA background, no ambient glow outside silhouette, no ground/shadow/platform, no text, no labels, no grid lines. Landscape sheet with EXACTLY 8 equal columns and 5 equal rows (40 full-body drawings), consistent cell sizes, generous margins between sprites. Entire creature including tail/weapon inside its own cell. All cells same anatomical scale, shared feet/support baseline about 88% cell height, body centered. Draw whole body poses, not cutout articulated limbs. Orthographic game camera slightly elevated. Five ROW orientations: row1 facing RIGHT (east); row2 facing DOWN toward viewer (south); row3 facing UP away, BACK VIEW (north); row4 facing diagonally DOWN-RIGHT toward viewer (southeast); row5 facing diagonally UP-RIGHT away, back three-quarter view (northeast). Do not rotate a flat side sprite in the image plane; actually draw the front and back. Other three directions will be mirrored by the game. In EVERY row the 8 COLUMNS have fixed meaning: col1 relaxed idle; cols2-5 a smooth four-phase in-place locomotion cycle, visibly changing limb/support poses, returning to col2; col6 clear attack anticipation pulling back; col7 attack impact extending toward the row's facing direction; col8 follow-through/recovery coming back toward idle. No movement of the whole sprite across its cell. Clear changes between frames but consistent proportions. The weapon if any remains in same hand.",
+  "creatures": [
+    {
+      "id": "esqueleto-sem-cabeca",
+      "detail": "Weathered ivory HEADLESS skeleton: it has NO skull or helmet in ANY frame, visibly ends at neck stump. Ragged brown waistcloth and subdued teal light inside ribs. Four walking poses alternate both legs, knees and arm swing naturally. Attack col6 draws one clawed hand back, col7 makes a broad forward claw swipe with torso turn, col8 lowers hand to recover. No extra appendages, no new equipment."
+    },
+    {
+      "id": "gosma",
+      "detail": "Small moss-green translucent slime with two pale yellow eyes and dark core. No legs or hands. Locomotion columns show a rolling undulation, contracting tall then flowing broad then contracting opposite side then upright, base stays at same ground baseline. Attack col6 compresses low and draws mass back, col7 stretches forward in a short body ram, col8 settles in a flatter recovery. Front eyes visible when facing down; on back/up rows eyes are naturally occluded. Preserve goo identity, not a spherical hopping ball. No glowing halo."
+    },
+    {
+      "id": "rato",
+      "detail": "Lean scruffy brown-grey rat, pink paws and ears, two small incisors and long naked curved tail. Exactly four natural quadruped legs. Four running phases visibly alternate fore/hind pairs and flex the spine, no hopping on one leg. Attack col6 crouches with neck back and jaw opening, col7 neck and snout extend forward in a bite, col8 jaw closes and body pulls back. Tail belongs fully inside each cell. Back/up views must show rat rump and rear of ears instead of face."
+    },
+    {
+      "id": "carapaca",
+      "detail": "Stone-shelled BEETLE with six jointed insect legs, two antennae, split dark rocky elytra, muted ochre chips and small pale teal eyes. Walk columns alternate the two tripod leg groups visibly, shell stays stable, all six legs coherent. Attack col6 lowers head and braces legs, col7 thrusts mandibles/head forward for a short headbutt, col8 braces and settles. Shell is a beetle body, not a boulder with a human head. Back rows show elytra and rear legs, not front face. No halo, no extra crystal."
+    },
+    {
+      "id": "armadura-possuida",
+      "detail": "Empty possessed rusty medieval armor, battered open helmet with black void and tiny teal eyes, chipped mismatched shoulders/chest/gauntlets/greaves, torn brown cloth, same short iron mace in same hand. No flesh or visible skeleton inside empty gaps. Four walking frames have a heavy alternating march with both feet distinct. Attack col6 lifts mace overhead, col7 brings mace down in a forceful descending blow, col8 low follow-through then recovery. In back views show back of helmet and backplate, never eyes through helmet back. No shield, do not remove mace."
+    }
+  ],
+  "alphaExtraction": "Use case: background-extraction. This is an existing approved animation sprite atlas. Remove ONLY the background, ambient shadow, hazy halos, red/grey edge noise and all speckles outside the actual creatures. Produce clean true transparent alpha around each separate sprite. Preserve all 40 creature drawings, every individual pose, exact layout of EIGHT columns and FIVE rows, orientation, colors, details, identity, original pixel positions and same canvas dimensions. Do NOT add, erase, merge, reposition, resize, restyle or redraw any creature. Transparent holes between limbs and inside empty armor remain transparent. Edges should be clean anti-aliased without red, grey or colored matte. No outer glow. Absolutely no solid fill or checkerboard background."
+}

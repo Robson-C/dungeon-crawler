@@ -2,12 +2,18 @@ const assert = require("node:assert/strict");
 const {setup, itemName} = require("./harness.cjs");
 
 async function main() {
-  const {run,bag,weaponSlot,inventory,drag,elements,document,window} = await setup();
+  const {run,bag,weaponSlot,inventory,drag,clickWorld,elements,document,window} = await setup();
   const popup = elements.get("item-tooltip");
   const name = elements.get("item-tooltip-name");
   const stats = elements.get("item-tooltip-stats");
   const art = elements.get("item-tooltip-art");
 
+  assert(bag.every(slot=>itemName(slot)==="vazio"),"A new run starts with an empty bag");
+  run(`for(const category of ['head','weapon','armor','necklace','boots','ring']) {
+    for(const item of itemCatalog.filter(item=>item.category===category).slice(0,3)) {
+      if(item!==gameItems.shortSword)inventoryView.addItem(item);
+    }
+  }inventoryView.addItem(gameItems.spear);`);
   assert(popup.hidden);
   weaponSlot.dispatch("pointerenter");
   assert.equal(popup.hidden,false);
@@ -74,6 +80,8 @@ async function main() {
   window.dispatch("blur");
   assert(popup.hidden);
   run("inventoryView.reset()");
+  assert(bag.every(slot=>itemName(slot)==="vazio"),"Reset clears added test items");
+  run("inventoryView.addItem(gameItems.curvedSabre)");
 
   run("const originalRandom=Math.random;let damageRolls=0;Math.random=()=>{damageRolls++;return 0;}");
   for (const key of ["shortSword","curvedSabre","crystalSword","spear"]) {
@@ -118,23 +126,24 @@ async function main() {
   run("gameItems.curvedSabre.damage={min:1,max:2}");
   drag(sabreInBag,weaponSlot);
 
-  // Exercise Space through the real frame loop, including a missed cut.
-  run(`keys.clear();floor.tiles.fill(1);floor.enemies=[{...enemySpawn,x:178,y:160,state:'recovery',remaining:10,health:10,armor:1}];
+  inventory.close();
+  // Exercise a clicked target through the real frame loop, including a missed cut.
+  run(`clearPlayerOrder();floor.tiles.fill(1);floor.enemies=[{...enemySpawn,x:178,y:160,state:'recovery',remaining:10,health:10,armor:1}];
     Object.assign(player,{x:160,y:160,strength:3,armor:0,health:3,finished:false});
     Math.random=()=>.999999;clearSwings();gameTime=0;previous=null;frame(0);`);
-  window.dispatch("keydown",{code:"Space"});
+  clickWorld(178,152);
   run("frame(20);frame(170)");
   assert.equal(run("floor.enemies[0].health"),6);
   run("frame(220);frame(330)");
   assert.equal(run("floor.enemies[0].health"),6);
   assert.equal(run("swing"),null);
-  run("floor.enemies[0].x=500;damageRolls=0;Math.random=()=>{damageRolls++;return 0;}");
-  window.dispatch("keydown",{code:"Space"});
-  run("frame(350);frame(500)");
+  run("floor.enemies[0].x=178;damageRolls=0;Math.random=()=>{damageRolls++;return 0;}");
+  clickWorld(178,152);
+  run("frame(350);floor.enemies[0].x=500;frame(500);clearPlayerOrder()");
   assert.equal(run("damageRolls"),0,"Missed cut does not roll damage");
 
   function enemyHit(strength,armor,health=3) {
-    run(`keys.clear();clearSwings();Object.assign(player,{x:160,y:160,armor:${armor},health:${health},finished:false});
+    run(`clearPlayerOrder();clearSwings();Object.assign(player,{x:160,y:160,armor:${armor},health:${health},finished:false});
       floor.enemies=[{...enemySpawn,x:178,y:160,strength:${strength},state:'windup',remaining:.01,direction:Math.PI}];
       updateEnemy(floor.enemies[0],1000,.02);`);
     return run("player.health");
@@ -151,11 +160,12 @@ async function main() {
   assert.equal(run("player.health"),run("initialCharacterStats(player.race,player.characterClass).maxHealth"));
   assert.equal(run("player.finished"),false);
   assert.equal(run("inventoryView.getEquipped('weapon').id"),"short-sword");
+  assert(bag.every(slot=>itemName(slot)==="vazio"),"Restart keeps only the equipped starting sword");
   run("Math.random=originalRandom");
   console.log(JSON.stringify({
     result:"passed",
     tooltip:"All occupied slots, name/icon/damage, empty slot, keyboard, edge positioning, resize, scroll, drag, swap, close, blur",
-    combat:"Inclusive damage 1–2, strength, armor for both sides, unarmed, older item, one hit per cut, Space input, miss, overkill, death and restart"
+    combat:"Inclusive damage 1–2, strength, armor for both sides, unarmed, older item, one hit per cut, mouse input, miss, overkill, death and restart"
   },null,2));
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

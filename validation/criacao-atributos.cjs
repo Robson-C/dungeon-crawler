@@ -43,7 +43,10 @@ async function main() {
     for (const [key,value] of Object.entries(expected)) assert.equal(player[key],value,`Run ${race}/${characterClass} ${key}`);
     assert.equal(player.maxHealth,expected.health);
     assert.equal(player.maxEnergy,100);
-    assert.equal(elements.get("health").textContent,`Vida ${expected.health}/${expected.health}`);
+    assert.equal(elements.get("health").getAttribute("aria-valuenow"),String(expected.health));
+    assert.equal(elements.get("health").textContent,"");
+    assert.equal(elements.get("health-fill").style.transform,"scaleX(1)");
+    assert.equal(elements.get("energy-fill").style.transform,"scaleX(1)");
     assert.equal(elements.get("inventory-health").textContent,`${expected.health}/${expected.health}`);
     run("showCharacterSheet()");
     for (const field of stats) {
@@ -98,7 +101,8 @@ async function main() {
   choose(races,"goblin");choose(classes,"guardian");run("updateCharacter()");
   elements.get("start").dispatch("click");
   run("player.health=1;player.energy=2;player.finished=true;showHealth()");
-  assert.equal(elements.get("health").textContent,"Vida 1/100");
+  assert.equal(elements.get("health-fill").style.transform,"scaleX(0.01)");
+  assert.equal(elements.get("energy-fill").style.transform,"scaleX(0.02)");
   elements.get("reset").dispatch("click");
   assert.equal(run("player.health"),100);
   assert.equal(run("player.energy"),100);

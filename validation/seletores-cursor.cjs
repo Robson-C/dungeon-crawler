@@ -6,6 +6,9 @@ const {setup,itemName} = require("./harness.cjs");
 
 async function main() {
   const {run,elements,races,classes,document,window,bag,equipment,inventory,drag,weaponSlot,raster,loaded}=await setup();
+  assert(bag.every(slot=>itemName(slot)==="vazio"),"A new character has no test items");
+  assert.equal(equipment.filter(slot=>itemName(slot)!=="vazio").length,1);
+  run("inventoryView.addItem(itemCatalog.find(item=>item.category==='head'));inventoryView.addItem(gameItems.curvedSabre)");
   let clicks=0;
   for(const [type,list,other] of [["race",races,classes],["class",classes,races]]) {
     const otherBefore=other.find(option=>option.checked).value;
@@ -77,6 +80,32 @@ async function main() {
 
   const root=path.resolve(__dirname,"..");
   const css=fs.readFileSync(path.join(root,"style.css"),"utf8");
+  // Delegated capture guards apply even while the game/menu is hidden or a dialog is open.
+  let nativeGuardCases=0;
+  const surfaces=[document.body,...["menu","play","character-create","preview","race-current","class-current",
+    "instructions","game","room","inventory","ability-picker","ability-choices","item-catalog","item-tooltip","end"]
+    .map(id=>elements.get(id)),weaponSlot,bag[0],elements.get("ability-choices").children[0]];
+  for(const target of surfaces)for(const type of ["contextmenu","selectstart","dragstart"]){
+    let prevented=false;
+    document.dispatch(type,{target,preventDefault(){prevented=true;}});
+    assert(prevented,type+" is blocked on "+(target.id||target.tagName));nativeGuardCases++;
+  }
+  for(const modifier of ["ctrlKey","metaKey"]){
+    let prevented=false;
+    document.dispatch("keydown",{code:"KeyA",[modifier]:true,preventDefault(){prevented=true;}});
+    assert(prevented,"Select all is blocked with "+modifier);nativeGuardCases++;
+  }
+  for(const values of [{code:"Tab"},{code:"Enter"},{code:"Space"},{code:"Digit1"},{code:"KeyR"},
+    {code:"KeyA"},{code:"KeyC",ctrlKey:true}]){
+    let prevented=false;
+    document.dispatch("keydown",{...values,preventDefault(){prevented=true;}});
+    assert(!prevented,"The native selection guard leaves other controls alone: "+values.code);
+  }
+  assert(/\*\s*\{[^}]*-webkit-user-select:\s*none;[^}]*user-select:\s*none;/s.test(css));
+  assert(/img\s*\{[^}]*-webkit-user-drag:\s*none;/s.test(css));
+  inventory.close();
+  run("abilities.assign(0,'fire')");window.dispatch("keydown",{code:"Digit1"});assert(run("abilities.isAiming()"));
+  elements.get("room").dispatch("pointerdown",{button:2});assert(!run("abilities.isAiming()"),"Right click still cancels aiming");
   assert(css.includes("html.holding-item * { cursor: var(--cursor-closed) !important; }"));
   assert(css.includes("cursor: var(--cursor-open)"));
   assert(css.includes("border-image: url(\"assets/creation-selector-plaque.png\")"));
@@ -135,8 +164,8 @@ async function main() {
       assert(bottom<.44*creationHeight,"Longest traits fit above selectors at "+width);
     }
   }
-  console.log(JSON.stringify({result:"passed",clicks,cleanupCases,
-    cases:"Direct-name clicks, dynamic selection, untouched other row, press/release, invalid and valid swap, all cancellation paths, cursor alpha/hotspots, measured text fit",
+  console.log(JSON.stringify({result:"passed",clicks,cleanupCases,nativeGuardCases,
+    cases:"Direct-name clicks, dynamic selection, untouched other row, press/release, invalid and valid swap, all cancellation paths, global context/selection/native drag guards, right-click aim cancel, cursor alpha/hotspots, measured text fit",
     limitation:"Text fit calculated in local rasterizer; browser visual test remains unavailable"},null,2));
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -11,7 +11,8 @@
   background: #101515;
   cursor: var(--cursor-point);
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+img { -webkit-user-drag: none; }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #252c28, #101515 75%); }
 main {
   --game-width: 94vw;
@@ -27,8 +28,7 @@ h1 { font-size: clamp(26px, 4vw, 46px); letter-spacing: -.04em; }
 .depth { font: 13px "Courier New", monospace; color: #d8c6a1; }
 .depth i { color: #edb168; font-style: normal; }
 .run-status { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
-#health { color: #e8aa92; font: 13px "Courier New", monospace; }
-.frame { --hud-inset: 8px; --hud-slot-height: 19px; position: relative; container-type: inline-size; padding: 5px; border: 1px solid #746649; background: #121918; box-shadow: 0 12px 36px #0006; }
+.frame { --hud-inset: 8px; --ability-size: clamp(20px, 5cqw, 58px); --ability-gap: clamp(3px, .6cqw, 7px); --resource-height: clamp(6px, .85cqw, 10px); --hud-height: calc(var(--ability-size) + var(--resource-height) + 6px); position: relative; container-type: inline-size; padding: 5px; border: 1px solid #746649; background: #121918; box-shadow: 0 12px 36px #0006; }
 #room { image-rendering: auto; }
 #room:focus { outline: none; }
 canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
@@ -36,7 +36,7 @@ footer { margin-top: 16px; color: #c1c7bc; font-size: 14px; flex-wrap: wrap; }
 .compass { margin-right: 5px; color: #efb56a; }
 .controls { color: #adb6ae; }
 kbd { font: 12px "Courier New", monospace; color: #d6dace; border: 1px solid #535d54; border-radius: 3px; padding: 2px 5px; }
-#end { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; background: #0b1111bd; }
+#end { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; background: #0b1111bd; }
 #end[hidden] { display: none; }
 .card { min-width: min(255px, 90%); padding: 18px 24px 24px; text-align: center; border: 1px solid #98835a; background: #1c2522; }
 .rune { color: #e9ae62; font-size: 24px; }
@@ -330,7 +330,6 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 dialog { max-width: min(390px, 90vw); padding: 25px; color: #eee3cc; background: #1c2522; border: 1px solid #98835a; line-height: 1.5; }
 dialog::backdrop { background: #0b1111ce; }
 #inventory {
-  --hud-height: calc(var(--hud-slot-height) + 8px);
   --frame-border: clamp(10px, 2.15cqw, 24px);
   --slot-size: clamp(36px, 7.2cqw, 76px);
   --equipment-slot-size: clamp(29px, 4.8cqw, 53px);
@@ -629,11 +628,77 @@ html.holding-item, html.holding-item * { cursor: var(--cursor-closed) !important
   grid-template-rows: repeat(4, var(--slot-size));
   gap: var(--slot-gap);
 }
-.ability-bar { position: absolute; inset-inline: 0; bottom: var(--hud-inset); display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; width: min(180px, 45%); margin-inline: auto; padding: 3px; border: 1px solid #786446; background: #131f21; box-shadow: 0 2px 7px #090603a3; }
-.ability-bar span { height: var(--hud-slot-height); background: url("assets/inventory-carved-stone.png") left top / 200% 200% no-repeat; }
+.game-hud {
+  --inventory-button-width: clamp(57px, 10cqw, 110px);
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 var(--hud-inset);
+  display: grid;
+  grid-template-columns: var(--inventory-button-width) max-content var(--inventory-button-width);
+  align-items: end;
+  gap: var(--ability-gap);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--hud-inset));
+  margin-inline: auto;
+}
+@container (max-width: 250px) {
+  .game-hud { grid-template-columns: var(--inventory-button-width) max-content; }
+}
+#open-inventory {
+  display: grid;
+  place-items: center;
+  height: var(--ability-size);
+  padding: 0 4px;
+  border: 3px solid #88734e;
+  border-image: url("assets/inventory-frame.png") 96 103 stretch;
+  background: url("assets/inventory-carved-stone.png") right top / 200% 200% no-repeat, #192325;
+  color: #eddbb8;
+  font: 600 clamp(8px, 1.35cqw, 15px)/1 "Lora", Georgia, serif;
+}
+#open-inventory:hover, #open-inventory[aria-expanded="true"] { filter: brightness(1.2); }
+#open-inventory:disabled { opacity: .5; }
+.ability-panel { display: grid; gap: 5px; }
+.resource-bars { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.resource-bars::after {
+  position: absolute;
+  content: "";
+  top: -1px;
+  bottom: -1px;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: #c0a26a;
+}
+.resource-bar { height: var(--resource-height); overflow: hidden; border: 1px solid #85724d; background: #111718; }
+.resource-bar span { display: block; width: 100%; height: 100%; }
+.health-bar span { transform-origin: right center; background: linear-gradient(#e36b48, #b72d25 50%, #8b2424); }
+.energy-bar span { transform-origin: left center; background: linear-gradient(#f6dc8c, #d5a746 50%, #9d722d); }
+.ability-bar { display: grid; grid-template-columns: repeat(5, var(--ability-size)); gap: var(--ability-gap); }
+.ability-bar span {
+  display: flex;
+  align-items: end;
+  justify-content: end;
+  width: var(--ability-size);
+  height: var(--ability-size);
+  padding: clamp(3px, .6cqw, 7px);
+  color: #d4c19b88;
+  font: 600 clamp(8px, 1.1cqw, 12px)/1 "Lora", Georgia, serif;
+  background: url("assets/inventory-desktop.png") 35.9613% 94.2184% / 1706.6667% 1137.7778% no-repeat;
+  clip-path: polygon(12% 1%, 88% 1%, 99% 12%, 99% 88%, 88% 99%, 12% 99%, 1% 88%, 1% 12%);
+}
+#game-feedback {
+  position: absolute;
+  z-index: 1;
+  inset: auto 8px calc(var(--hud-height) + 2 * var(--hud-inset));
+  margin: 0;
+  color: #f0d6a2;
+  text-align: center;
+  font: 600 clamp(10px, 1.4cqw, 16px)/1.3 "Lora", Georgia, serif;
+  text-shadow: 0 2px 3px #050909, 1px 0 2px #050909;
+  pointer-events: none;
+}
 #back-menu { background: transparent; color: #dccdb3; }
 @container (max-width: 900px) {
-  #inventory, .ability-bar { --hud-inset: 6px; --hud-slot-height: 15px; }
+  .frame { --hud-inset: 6px; }
   #inventory {
     --frame-border: 11px;
     --slot-size: clamp(36px, 6.9cqw, 58px);
@@ -660,7 +725,7 @@ html.holding-item, html.holding-item * { cursor: var(--cursor-closed) !important
   .stat-list abbr { display: inline; }
 }
 @container (max-width: 600px) {
-  #inventory, .ability-bar { --hud-inset: 4px; --hud-slot-height: 12px; }
+  .frame { --hud-inset: 4px; }
   #inventory {
     --panel-padding: 5px;
     --frame-border: 8px;
@@ -720,7 +785,7 @@ html.holding-item, html.holding-item * { cursor: var(--cursor-closed) !important
   }
 }
 @container (max-width: 375px) {
-  #inventory, .ability-bar { --hud-inset: 3px; --hud-slot-height: 11px; }
+  .frame { --hud-inset: 3px; }
   #inventory { --frame-border: 5px; --panel-padding: 3px; font-size: 9px; line-height: 1.05; }
   .inventory-content { row-gap: 2px; padding-block: 2px; }
   .inventory-content h3 { padding-block: 0; }

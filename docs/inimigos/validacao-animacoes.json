@@ -1,0 +1,10 @@
+{
+  "result": "passed",
+  "sourceFrames": 200,
+  "draws": 720,
+  "seedComparisons": 100,
+  "directions": 8,
+  "families": 5,
+  "cases": "Directional sprites, mirrored left views, stride/stop, impact/recovery, single hit, dodge, walls, sword kills, deterministic cosmetic pool and unchanged map/count/stats",
+  "limitation": "Local Canvas/DOM tests; browser visual verification pending"
+}

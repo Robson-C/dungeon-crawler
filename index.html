@@ -6,9 +6,12 @@
   <title>Chaos Crawl</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="inventory-desktop.css">
+  <link rel="stylesheet" href="abilities.css">
   <script src="items.js" defer></script>
   <script src="inventory.js" defer></script>
+  <script src="enemy-art-data.js" defer></script>
   <script src="gameplay-art.js" defer></script>
+  <script src="abilities.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
@@ -104,17 +107,19 @@
     </section>
     <dialog id="instructions" aria-labelledby="help-title">
       <h2 id="help-title">Como jogar</h2>
-      <p>Use <kbd>WASD</kbd> ou as <kbd>setas</kbd> para andar. Aperte <kbd>Espaço</kbd> para atacar na direção do movimento.</p>
-      <p>Quando o inimigo levantar a lança, recue. A vida inicial depende da raça e classe escolhidas.</p>
+      <p>Clique no chão para andar. Clique em um inimigo para se aproximar e atacar; clique em outro ponto para mudar a ordem.</p>
+      <p>Observe a preparação do golpe de cada inimigo para desviar. A vida inicial depende da raça e classe escolhidas.</p>
+      <p>Clique nos ícones para escolher habilidades de teste. As teclas <kbd>1–5</kbd> ativam; habilidades com mira aguardam um clique. Botão direito ou <kbd>Esc</kbd> cancela a mira. <kbd>R</kbd> recupera Energia para teste.</p>
       <p>Explore as salas e pise na escada para descer. Você pode deixar inimigos para trás.</p>
-      <p>Aperte <kbd>I</kbd> para abrir o inventário. Pressione <kbd>Esc</kbd> ou clique fora para fechar. Os inimigos continuam ativos.</p>
+      <p>Clique em um item no chão para se aproximar e recolher. Se a mochila estiver cheia, ele permanece no chão.</p>
+      <p>Use o botão Inventário à esquerda das habilidades. Pressione <kbd>Esc</kbd> ou clique fora para fechar. Os inimigos continuam ativos.</p>
+      <p>As barras acima das habilidades mostram vida em vermelho e energia em dourado. Pressione <kbd>Esc</kbd> para cancelar a ordem atual.</p>
       <form method="dialog"><button>Voltar</button></form>
     </dialog>
     <div id="game" hidden>
     <header>
       <h1>Chaos Crawl</h1>
       <div class="run-status">
-        <span id="health" role="status" aria-atomic="true"></span>
         <span class="depth" role="status"><i aria-hidden="true">↓</i> Andar <span id="floor-number">01</span></span>
       </div>
     </header>
@@ -187,14 +192,27 @@
         </div>
       </div>
     </dialog>
-      <div class="ability-bar" role="img" aria-label="Barra de habilidades com cinco espaços vazios">
-        <span></span><span></span><span></span><span></span><span></span>
+      <div class="game-hud">
+        <button type="button" id="open-inventory" aria-controls="inventory" aria-expanded="false">Inventário</button>
+        <div id="ability-panel" class="ability-panel">
+          <div id="ability-picker" class="ability-picker" hidden>
+            <div class="ability-picker-header"><strong id="ability-picker-title">Escolher habilidade</strong><button type="button" id="ability-picker-close" aria-label="Fechar seleção de habilidade">×</button></div>
+            <div id="ability-choices" class="ability-choices"></div>
+          </div>
+          <div class="resource-bars">
+            <div id="health" class="resource-bar health-bar" role="progressbar" aria-label="Vida" aria-valuemin="0"><span id="health-fill" aria-hidden="true"></span></div>
+            <div id="energy" class="resource-bar energy-bar" role="progressbar" aria-label="Energia" aria-valuemin="0"><span id="energy-fill" aria-hidden="true"></span></div>
+          </div>
+          <div id="ability-slots" class="ability-bar" role="group" aria-label="Habilidades, teclas de 1 a 5"></div>
+        </div>
       </div>
+      <p id="game-feedback" role="status" aria-live="polite" hidden></p>
     </section>
     <footer>
       <span><b class="compass" aria-hidden="true">◇</b> Alcance a escada</span>
       <button type="button" id="open-item-catalog">Catálogo de teste</button>
-      <span class="controls"><kbd>WASD</kbd> ou <kbd>↑ ← ↓ →</kbd> para mover · <kbd>Espaço</kbd> para atacar · <kbd>I</kbd> Inventário</span>
+      <span class="controls">Clique para mover, atacar ou recolher · <kbd>1–5</kbd> Habilidades · <kbd>R</kbd> Energia de teste · <kbd>Esc</kbd> cancelar</span>
+      <span id="ability-feedback" class="ability-feedback" role="status" aria-live="polite"></span>
     </footer>
     </div>
   </main>

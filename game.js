@@ -1,10 +1,22 @@
 "use strict";
 
+// These browser interactions are suppressed across menus, dialogs and the map.
+// Pointer events still drive the inventory's own item drag and aiming cancellation.
+for (const type of ["contextmenu", "selectstart", "dragstart"]) {
+  document.addEventListener(type, event => event.preventDefault(), { capture: true });
+}
+document.addEventListener("keydown", event => {
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === "KeyA") event.preventDefault();
+}, { capture: true });
+
 const world = { width: 896, height: 512 };
 const tileSize = 16;
 const columns = world.width / tileSize, rows = world.height / tileSize;
 const radius = 5;
 const speed = 72;
+const attributeTiming = Object.freeze({ periodMs: 10000, tickMs: 500 });
+const enemyDropChance = 0.5;
+const dropAnimation = { flight: 420, bounce: 180, deathFade: 180 };
 const baseCharacterStats = Object.freeze({
   health: 100, energy: 100, armor: 10, strength: 10, stamina: 10, willpower: 10, intellect: 10,
   fireResistance: 0, iceResistance: 0, poisonResistance: 0, lightningResistance: 0
@@ -44,6 +56,14 @@ const enemyRules = { notice: 46, loseInterest: 96, speed: 49, attackRange: 17, r
   windup: 0.55, recovery: 0.75 };
 const enemySpawn = { radius: 6, health: targetMaxHealth, strength: 1, armor: 0, flashUntil: 0, state: "idle",
   direction: Math.PI, remaining: 0 };
+const enemyFamilies = Object.keys(enemyArtData);
+
+// A separate cosmetic stream preserves map generation and the number of enemies.
+function enemyFamilyAt(seed, number, index) {
+  let value = (seed ^ Math.imul(number, 0x9e3779b1) ^ Math.imul(index + 1, 0x85ebca6b)) >>> 0;
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d) >>> 0;
+  return enemyFamilies[value % enemyFamilies.length];
+}
 let runSeed, depth, floor;
 const steps = [-columns, 1, columns, -1];
 
@@ -224,13 +244,13 @@ function generateFloor(seed, number) {
   }
   let layout;
   do {
-    layout = populateFloor(integer);
+    layout = populateFloor(integer, seed, number);
   } while (!layout);
   layout.appearance = gameplayArt.appearance(seed, number);
   return layout;
 }
 
-function populateFloor(integer) {
+function populateFloor(integer, seed, number) {
   const roll = integer(1, 100);
   const style = roll <= 18 ? "halls" : roll <= 44 ? "junction" : "mixed";
   const { tiles, rooms, hub } = carveLayout(integer, style);
@@ -259,15 +279,16 @@ function populateFloor(integer) {
   if (!landings.length) return null;
   const landing = tileCenter(landings[integer(0, landings.length - 1)]);
   const stairs = { left: landing.x - 16, right: landing.x + 16, top: landing.y - 14, bottom: landing.y + 15 };
-  const enemies = [], total = integer(2, 5);
+  const enemies = [], total = integer(2, 5) * 2;
   while (enemies.length < total && guardSites.length) {
     const p = tileCenter(guardSites.splice(integer(0, guardSites.length - 1), 1)[0]);
     if (Math.hypot(p.x - landing.x, p.y - landing.y) < 36 ||
         enemies.some(e => Math.hypot(p.x - e.x, p.y - e.y) < 35)) continue;
-    enemies.push({ ...enemySpawn, ...p });
+    enemies.push({ ...enemySpawn, ...p, type: enemyFamilyAt(seed, number, enemies.length),
+      moving: false, stride: 0, lookDirection: Math.PI, recoveryDuration: enemyRules.recovery });
   }
   if (enemies.length < total) return null;
-  return { tiles, spawn, stairs, enemies, pathOrigin: -1, paths: null };
+  return { tiles, spawn, stairs, enemies, drops: [], pathOrigin: -1, paths: null };
 }
 
 function clearFloor(x, y, r) {
@@ -300,6 +321,7 @@ const play = document.getElementById("play");
 const canvas = document.getElementById("room");
 const ctx = canvas.getContext("2d");
 const gameplayArt = createGameplayArt();
+const dropImages = new Map();
 const zoom = 1.5;
 const view = { width: 448 / zoom, height: 256 / zoom };
 const pixelsPerUnit = canvas.width / view.width;
@@ -316,11 +338,39 @@ inventoryFigureCanvas.hidden = true;
 inventoryFigureCanvas.setAttribute("aria-hidden", "true");
 inventoryFigure.append(inventoryFigureCanvas);
 const reset = document.getElementById("reset");
-const keys = new Set();
-const directions = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
+const inventoryButton = document.getElementById("open-inventory");
+const energyDisplay = document.getElementById("energy");
+const healthFill = document.getElementById("health-fill");
+const energyFill = document.getElementById("energy-fill");
+const gameFeedback = document.getElementById("game-feedback");
+const camera = { left: 0, top: 0 };
+const attackDistance = 18, pickupDistance = 10;
+let playerOrder = null;
+let ignoreWorldClick = false;
+let feedbackUntil = 0;
 let player;
 let previous = null;
 let gameTime = 0;
+let regenerationElapsedMs = 0;
+
+function formatResource(value) {
+  return String(Math.floor(value));
+}
+
+function regenerateResources(elapsedMs) {
+  if (!player || player.finished || player.health <= 0 || game.hidden ||
+      !Number.isFinite(elapsedMs) || elapsedMs <= 0) return;
+  regenerationElapsedMs += elapsedMs;
+  const ticks = Math.floor((regenerationElapsedMs + 1e-7) / attributeTiming.tickMs);
+  if (!ticks) return;
+  regenerationElapsedMs = Math.max(0, regenerationElapsedMs - ticks * attributeTiming.tickMs);
+  const fraction = ticks * attributeTiming.tickMs / attributeTiming.periodMs;
+  player.health = Math.min(player.maxHealth, player.health + Math.max(0, player.stamina) * fraction);
+  player.energy = Math.min(player.maxEnergy, player.energy + Math.max(0, player.willpower) * fraction);
+  showHealth();
+  abilities.refresh();
+  if (inventory.open) showCharacterSheet();
+}
 let facing = 1;
 let stride = 0;
 let playerMoved = false;
@@ -329,6 +379,30 @@ let lastDirection = 0;
 let swing = null;
 let pendingSwingDirection = null;
 const swingDuration = 300;
+let mousePoint = null;
+let doubleUntil = 0;
+let doubleConfirmationClick = null;
+const abilities = createAbilitySystem({
+  player: () => player, enemies: () => floor?.enemies || [], time: () => gameTime,
+  active: () => !game.hidden && !inventory.open && !itemCatalogDialog.open,
+  stop: () => { clearPlayerOrder(); clearSwings(); }, focus: () => canvas.focus(),
+  line: (a, b, r) => clearPath(a, b, r), floorClear: (x, y, r) => clearFloor(x, y, r),
+  enemyCanStand: (enemy, x, y) => clearFloor(x, y, enemy.radius) &&
+    Math.hypot(x - player.x, y - player.y) >= enemy.radius + radius &&
+    floor.enemies.every(other => other === enemy || !other.health ||
+      Math.hypot(x - other.x, y - other.y) >= enemy.radius + other.radius),
+  face: angle => { lastDirection = angle; facing = Math.cos(angle) < 0 ? -1 : 1; },
+  heading: () => lastDirection,
+  drawWeapon: (context, x, y, angle) => gameplayArt.equippedWeapon(context,
+    inventoryView.getEquipped("weapon"), x, y, angle),
+  beginDouble: angle => {
+    clearSwings(); doubleUntil = gameTime + 340;
+    swing = { direction: angle, started: gameTime, checked: 0, hit: true, ability: true,
+      x: player.x, y: player.y };
+  },
+  defeat: target => dropEnemyItem(target, gameTime), targetAt: point => enemyAt(point),
+  refresh: () => { showHealth(); if (inventory.open) showCharacterSheet(); }
+});
 
 function rect(x, y, w, h, color) {
   ctx.fillStyle = color;
@@ -527,7 +601,7 @@ function updateCharacter() {
   if (!existingHuman) gameplayArt.prepareCharacter(race.value, characterClass.value);
   const stats = initialCharacterStats(race.value, characterClass.value);
   for (const stat of Object.keys(baseCharacterStats)) {
-    document.getElementById(`creation-${stat}`).textContent = stats[stat];
+    document.getElementById(`creation-${stat}`).textContent = formatResource(stats[stat]);
   }
   for (const [type, definitions] of [["race", raceDefinitions], ["class", classDefinitions]]) {
     const options = characterOptions(type);
@@ -622,17 +696,34 @@ function pursuitPoint(enemy) {
   return clearPath(enemy, goal, enemy.radius) ? goal : tileCenter(id);
 }
 
+function enemyAttackConnects(target, dx, dy) {
+  const ux = Math.cos(target.direction), uy = Math.sin(target.direction);
+  const forward = dx * ux + dy * uy, side = Math.abs(dx * uy - dy * ux);
+  if (enemyArtData[target.type]?.attack === "swipe") {
+    return Math.hypot(dx, dy) <= enemyRules.reach + radius && forward >= 0 &&
+      side <= Math.max(radius, forward * .8);
+  }
+  const along = Math.max(0, Math.min(enemyRules.reach, forward));
+  return Math.hypot(dx - along * ux, dy - along * uy) <= radius;
+}
+
 function updateEnemy(target, now, dt) {
+  target.moving = false;
   if (!target.health || player.finished) return;
-  const dx = player.x - target.x, dy = player.y - target.y;
+  if (abilities.frozen(target)) return;
+  const victim = abilities.lure(target) || player;
+  const dx = victim.x - target.x, dy = victim.y - target.y;
   const distance = Math.hypot(dx, dy);
   if (target.state === "windup" || target.state === "recovery") {
     target.remaining -= dt;
     if (target.remaining > 0) return;
     if (target.state === "windup") {
-      const ux = Math.cos(target.direction), uy = Math.sin(target.direction);
-      const along = Math.max(0, Math.min(enemyRules.reach, dx * ux + dy * uy));
-      if (Math.hypot(dx - along * ux, dy - along * uy) <= radius && clearPath(target, player, 0)) {
+      if (enemyAttackConnects(target, dx, dy) && clearPath(target, victim, 0)) {
+        if (victim !== player) {
+          abilities.hitDecoy(); target.state = "recovery";
+          target.remaining = target.recoveryDuration = enemyRules.recovery;
+          return;
+        }
         const damage = calculateDamage(target.strength ?? 1, target.weapon, player.armor);
         player.health = Math.max(0, player.health - damage);
         player.flashUntil = now + 240;
@@ -641,21 +732,22 @@ function updateEnemy(target, now, dt) {
       }
       target.state = "recovery";
       target.remaining = enemyRules.recovery;
+      target.recoveryDuration = enemyRules.recovery;
       return;
     }
     target.state = "chase";
   }
   const limit = target.state === "idle" ? enemyRules.notice : enemyRules.loseInterest;
   if (distance > limit) { target.state = "idle"; return; }
-  target.direction = Math.atan2(dy, dx);
-  if (target.state === "idle" && !clearPath(target, player, 0)) return;
-  if (distance <= enemyRules.attackRange && clearPath(target, player, 0)) {
+  if (target.state === "idle" && !clearPath(target, victim, 0)) return;
+  if (distance <= enemyRules.attackRange && clearPath(target, victim, 0)) {
+    target.direction = Math.atan2(dy, dx);
     target.state = "windup";
     target.remaining = enemyRules.windup;
     return;
   }
   target.state = "chase";
-  const goal = pursuitPoint(target);
+  const goal = victim === player ? pursuitPoint(target) : victim;
   const vx = goal.x - target.x, vy = goal.y - target.y;
   const length = Math.hypot(vx, vy);
   if (!length) return;
@@ -663,14 +755,37 @@ function updateEnemy(target, now, dt) {
   const x = target.x + vx * step, y = target.y + vy * step;
   if (clearFloor(x, y, target.radius) && Math.hypot(x - player.x, y - player.y) >= target.radius + radius &&
       floor.enemies.every(other => other === target || !other.health || Math.hypot(x - other.x, y - other.y) >= target.radius + other.radius)) {
+    target.direction = target.lookDirection = Math.atan2(vy, vx);
+    target.stride = (target.stride ?? 0) + Math.hypot(x - target.x, y - target.y);
+    target.moving = true;
     target.x = x; target.y = y;
   }
 }
 
 function drawTarget(target, now) {
-  if (target.health === 0) return;
+  const dead = target.health === 0;
+  const elapsed = dead ? now - target.diedAt : 0;
+  if (dead && (!Number.isFinite(elapsed) || elapsed < 0 || elapsed >= dropAnimation.deathFade)) return;
+  ctx.save();
+  if (dead) {
+    const progress = elapsed / dropAnimation.deathFade;
+    ctx.globalAlpha *= 1 - progress;
+    ctx.translate(0, progress * 2);
+  }
+  drawTargetPose(target, dead ? target.diedAt : now, !dead);
+  ctx.restore();
+}
+
+function drawTargetPose(target, now, showHealth) {
   const x = Math.round(target.x), y = Math.round(target.y);
-  const hit = now < target.flashUntil;
+  const hit = showHealth && now < target.flashUntil;
+  if (gameplayArt.enemy(ctx, showHealth ? target : { ...target, flashUntil: 0 }, now)) {
+    const top = y - enemyArtData[target.type].height - 3;
+    for (let i = 0; showHealth && i < targetMaxHealth; i++) {
+      rect(x - 7 + i * 5, top, 4, 1.2, i < target.health ? "#f1ce85" : "#202b2d");
+    }
+    return;
+  }
   const illustratedPose = target.state === "windup" ? 3
     : target.state === "chase" ? 1 + Math.floor(now / 140) % 2 : 0;
   const illustratedFacing = Math.cos(target.direction) < 0 ? -1 : 1;
@@ -679,7 +794,7 @@ function drawTarget(target, now) {
     const ready = target.state === "windup";
     gameplayArt.weapon(ctx, x, y - 8, ready ? -Math.PI / 2 : target.direction,
       thrusting ? enemyRules.reach : ready ? 14 : 9, ready);
-    for (let i = 0; i < targetMaxHealth; i++) {
+    for (let i = 0; showHealth && i < targetMaxHealth; i++) {
       rect(x - 7 + i * 5, y - 25, 4, 1.2, i < target.health ? "#f1ce85" : "#202b2d");
     }
     return;
@@ -710,8 +825,82 @@ function drawTarget(target, now) {
   rect(3, -1, reach - 3, 2, "#876342");
   rect(reach - 4, -1.5, 4, 3, ready ? "#ffd484" : "#d9d9be");
   ctx.restore();
-  for (let i = 0; i < targetMaxHealth; i++) {
+  for (let i = 0; showHealth && i < targetMaxHealth; i++) {
     rect(x - 7 + i * 5, y - 26, 4, 2, i < target.health ? "#f1ce85" : "#202b2d");
+  }
+}
+
+function dropEnemyItem(target, now = gameTime) {
+  if (target.health !== 0 || target.dropRolled) return;
+  // Resolve once even when the roll produces nothing.
+  target.dropRolled = true;
+  target.diedAt = now;
+  if (Math.random() >= enemyDropChance) return;
+  const item = itemCatalog[Math.floor(Math.random() * itemCatalog.length)];
+  // Toss away from the player, trying nearby directions before staying in place.
+  const direction = Math.atan2(target.y - player.y, target.x - player.x);
+  let x = target.x, y = target.y;
+  for (const offset of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI]) {
+    const landing = { x: target.x + Math.cos(direction + offset) * 9,
+      y: target.y + Math.sin(direction + offset) * 9 };
+    if (!clearFloor(landing.x, landing.y, 3) || !clearPath(target, landing, 3)) continue;
+    ({ x, y } = landing);
+    break;
+  }
+  floor.drops.push({ item, x, y, originX: target.x, originY: target.y, startedAt: now });
+  if (!dropImages.has(item.icon)) {
+    const image = new Image();
+    image.src = item.icon;
+    dropImages.set(item.icon, image);
+  }
+}
+
+function dropPose(drop, now) {
+  const elapsed = Math.max(0, now - drop.startedAt);
+  const progress = Math.min(1, elapsed / dropAnimation.flight);
+  const bounce = Math.min(1, Math.max(0, (elapsed - dropAnimation.flight) / dropAnimation.bounce));
+  const inFlight = elapsed < dropAnimation.flight;
+  const bounceWave = bounce < 1 ? Math.sin(Math.PI * bounce) : 0;
+  const height = inFlight ? 10 * (1 - progress) + 40 * progress * (1 - progress)
+    : 3 * bounceWave;
+  const tilt = (drop.x >= drop.originX ? 1 : -1) *
+    (inFlight ? 0.55 * Math.sin(Math.PI * progress) : 0.12 * bounceWave);
+  return {
+    x: drop.originX + (drop.x - drop.originX) * progress,
+    y: drop.originY + (drop.y - drop.originY) * progress,
+    height, tilt, airborne: elapsed < dropAnimation.flight + dropAnimation.bounce
+  };
+}
+
+function drawDrops(now = gameTime, layer = "all") {
+  for (const drop of floor.drops) {
+    const pose = dropPose(drop, now);
+    if (layer !== "air") {
+      ctx.save();
+      ctx.translate(pose.x, pose.y);
+      const scale = 1 - Math.min(20, pose.height) / 40;
+      ctx.fillStyle = "#080d1299";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5 * scale, 1.7 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    if ((layer === "ground" && pose.airborne) || (layer === "air" && !pose.airborne)) continue;
+    const image = dropImages.get(drop.item.icon);
+    ctx.save();
+    ctx.translate(pose.x, pose.y - 2 - pose.height);
+    ctx.rotate(pose.tilt);
+    if (image?.complete && image.naturalWidth > 0) {
+      const scale = 14 / Math.max(image.naturalWidth, image.naturalHeight);
+      const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
+      ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    } else {
+      // Keep the drop visible while its existing item icon loads.
+      ctx.fillStyle = "#c8b58e";
+      ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-2, -2, 4, 4);
+    }
+    ctx.restore();
   }
 }
 
@@ -733,7 +922,9 @@ function checkSwordHit(now) {
       const along = Math.max(6, Math.min(pose.reach, dx * ux + dy * uy));
       if (Math.hypot(dx - along * ux, dy - along * uy) > target.radius || !clearPath(player, target, 0)) continue;
       const damage = calculateDamage(player.strength, inventoryView.getEquipped("weapon"), target.armor);
+      if (damage > 0) abilities.breakIce(target);
       target.health = Math.max(0, target.health - damage);
+      if (target.health === 0) dropEnemyItem(target, now);
       target.flashUntil = now + 120;
       swing.hit = true;
       return;
@@ -746,9 +937,20 @@ function checkSwordHit(now) {
 }
 
 function drawPlayer(now) {
-  if (playerMoved || swing || player.finished || player.race !== "human") {
+  const spin = abilities.circularPose();
+  abilities.drawCircular(ctx, "back");
+  ctx.save();
+  const tone = abilities.ironTone();
+  if (tone > 0) ctx.filter = `grayscale(${tone * .98}) brightness(${1 + tone * .16}) contrast(${1 + tone * .08})`;
+  drawPlayerFigure(now, spin);
+  ctx.restore();
+  abilities.drawCircular(ctx, "front");
+}
+
+function drawPlayerFigure(now, spin) {
+  if (playerMoved || swing || spin || player.finished || player.race !== "human") {
     idleStarted = null;
-    return drawPlayerPose(now);
+    return drawPlayerPose(now, spin);
   }
 
   idleStarted ??= now;
@@ -762,22 +964,26 @@ function drawPlayer(now) {
   ctx.restore();
 }
 
-function drawPlayerPose(now) {
+function drawPlayerPose(now, spin = null) {
   const x = Math.round(player.x), y = Math.round(player.y);
   const flashing = now < player.flashUntil && Math.floor((player.flashUntil - now) / 60) % 2 === 1;
-  const currentBlade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
+  const weapon = spin ? null : inventoryView.getEquipped("weapon");
+  const direction = spin ? Math.round(Math.atan2(Math.sin(spin.angle), Math.cos(spin.angle)) / (Math.PI / 4)) * Math.PI / 4
+    : swing?.direction ?? lastDirection;
+  const currentBlade = spin ? { phase: Math.min(.82, spin.phase), sweep: spin.sweep,
+    angle: spin.angle, cx: x, cy: y - 8, reach: 17 }
+    : swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
   if (gameplayArt.character(ctx, player.x, player.y, player.race, player.characterClass,
-      swing?.direction ?? lastDirection, playerMoved, stride, flashing, currentBlade,
-      inventoryView.getEquipped("weapon"))) return;
+      direction, playerMoved, stride, flashing, currentBlade, weapon)) return;
   if (player.race === "human" && player.characterClass === "guardian") {
     const blade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
     if (gameplayArt.guardian(ctx, player.x, player.y, swing?.direction ?? lastDirection,
-        playerMoved, stride, flashing, blade, inventoryView.getEquipped("weapon"))) return;
+        playerMoved, stride, flashing, blade, weapon)) return;
   }
   if (player.race === "human" && player.characterClass === "adventurer") {
     const cartoonBlade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
     if (gameplayArt.adventurer(ctx, player.x, player.y, swing?.direction ?? lastDirection,
-        playerMoved, stride, flashing, cartoonBlade, inventoryView.getEquipped("weapon"))) return;
+        playerMoved, stride, flashing, cartoonBlade, weapon)) return;
     if (swing) {
       const blade = bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
       const sign = Math.abs(swing.direction) > Math.PI / 2 ? -1 : 1;
@@ -807,7 +1013,7 @@ function drawPlayerPose(now) {
         const gripOffset = 2 + 8 * .145;
         const originX = handX - gripOffset * Math.cos(angle);
         const originY = handY - gripOffset * Math.sin(angle);
-        gameplayArt.weapon(ctx, originX, originY, angle, 9, false, true);
+        if (weapon) gameplayArt.weapon(ctx, originX, originY, angle, 9, false, true);
       }
       return;
     }
@@ -821,7 +1027,7 @@ function drawPlayerPose(now) {
   ctx.drawImage(flashing ? hurtSprite : adventurer, -7, -17 + bob * 0.5, 14, 17);
   if (!swing) {
     const handY = -6 + bob * 0.5;
-    gameplayArt.equippedWeapon(ctx, inventoryView.getEquipped("weapon"), 5, handY, -Math.PI / 4);
+    gameplayArt.equippedWeapon(ctx, weapon, 5, handY, -Math.PI / 4);
   }
   ctx.restore();
   if (swing) {
@@ -829,7 +1035,174 @@ function drawPlayerPose(now) {
   }
 }
 
-function held(first, second) { return Number(keys.has(first) || keys.has(second)); }
+function clearPlayerOrder() {
+  playerOrder = null;
+  pendingSwingDirection = null;
+}
+
+function worldPoint(event) {
+  const bounds = canvas.getBoundingClientRect();
+  if (!bounds.width || !bounds.height || event.clientX < bounds.left || event.clientX > bounds.right ||
+      event.clientY < bounds.top || event.clientY > bounds.bottom) return null;
+  return { x: camera.left + (event.clientX - bounds.left) / bounds.width * view.width,
+    y: camera.top + (event.clientY - bounds.top) / bounds.height * view.height };
+}
+
+function tellPlayer(message) {
+  gameFeedback.textContent = message;
+  gameFeedback.hidden = false;
+  feedbackUntil = gameTime + 2200;
+}
+
+function playerPathClear(a, b) {
+  if (!clearPath(a, b, radius)) return false;
+  const dx = b.x - a.x, dy = b.y - a.y, lengthSquared = dx * dx + dy * dy;
+  return floor.enemies.every(enemy => {
+    if (!enemy.health) return true;
+    const t = lengthSquared ? Math.max(0, Math.min(1,
+      ((enemy.x - a.x) * dx + (enemy.y - a.y) * dy) / lengthSquared)) : 0;
+    return Math.hypot(a.x + dx * t - enemy.x, a.y + dy * t - enemy.y) >= radius + enemy.radius;
+  });
+}
+
+// A route uses tile centers around walls, then follows the exact clicked point.
+// Enemies block routes as well as movement; smoothing never cuts through either.
+function findPlayerPath(goal, reach) {
+  const distance = Math.hypot(goal.x - player.x, goal.y - player.y);
+  const travel = Math.max(0, distance - Math.max(0, reach - 0.5));
+  const destination = distance ? { x: player.x + (goal.x - player.x) * travel / distance,
+    y: player.y + (goal.y - player.y) * travel / distance } : { x: player.x, y: player.y };
+  if (playerPathClear(player, destination) && (!reach || clearPath(destination, goal, 0))) return [destination];
+  const origin = tileAt(player.x, player.y), goalTile = tileAt(goal.x, goal.y);
+  const parents = new Int16Array(floor.tiles.length).fill(-1), queue = [origin];
+  parents[origin] = origin;
+  for (let index = 0; index < queue.length; index++) {
+    const id = queue[index], point = tileCenter(id);
+    const arrived = reach ? Math.hypot(point.x - goal.x, point.y - goal.y) <= reach && clearPath(point, goal, 0)
+      : id === goalTile && playerPathClear(point, goal);
+    if (arrived && (id !== origin || playerPathClear(player, point))) {
+      const route = [];
+      for (let cursor = id; cursor !== origin; cursor = parents[cursor]) route.push(tileCenter(cursor));
+      route.reverse();
+      if (!route.length && Math.hypot(player.x - point.x, player.y - point.y) > 0.35) route.push(point);
+      if (!reach) route.push({ x: goal.x, y: goal.y });
+      return route;
+    }
+    const col = id % columns, row = Math.floor(id / columns);
+    for (const next of [row > 0 ? id - columns : -1, col + 1 < columns ? id + 1 : -1,
+      row + 1 < rows ? id + columns : -1, col > 0 ? id - 1 : -1]) {
+      if (next < 0 || parents[next] !== -1 || !floor.tiles[next]) continue;
+      const neighbor = tileCenter(next);
+      if (!canStand(neighbor.x, neighbor.y)) continue;
+      if (!playerPathClear(id === origin ? player : point, neighbor)) continue;
+      parents[next] = id;
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
+function updatePlayerOrder(now, dt) {
+  if (!playerOrder || inventory.open || itemCatalogDialog.open || player.finished || abilities.isAiming() || abilities.isPicking()) return;
+  const order = playerOrder;
+  if ((order.type === "attack" && (!order.target.health || !floor.enemies.includes(order.target))) ||
+      (order.type === "pickup" && !floor.drops.includes(order.target))) { clearPlayerOrder(); return; }
+  const goal = order.target;
+  const reach = order.type === "attack" ? attackDistance : order.type === "pickup" ? pickupDistance : 0.35;
+  if (Math.hypot(goal.x - player.x, goal.y - player.y) <= reach && clearPath(player, goal, 0)) {
+    if (order.type === "attack") {
+      lastDirection = Math.atan2(goal.y - player.y, goal.x - player.x);
+      facing = Math.cos(lastDirection) < 0 ? -1 : 1;
+      if (!swing && now >= doubleUntil) pendingSwingDirection = lastDirection;
+    } else if (order.type === "pickup") {
+      if (dropPose(goal, now).airborne) return;
+      if (inventoryView.addItem(goal.item)) {
+        floor.drops.splice(floor.drops.indexOf(goal), 1);
+        tellPlayer(`${goal.item.name} recolhido.`);
+      } else tellPlayer("Mochila cheia.");
+      clearPlayerOrder();
+    } else clearPlayerOrder();
+    return;
+  }
+  const changed = !order.planned || Math.hypot(goal.x - order.planned.x, goal.y - order.planned.y) > 4;
+  const blocked = order.route?.length && !playerPathClear(player, order.route[0]);
+  if (!order.route?.length || ((changed || blocked) && now - order.plannedAt >= 180)) {
+    order.route = findPlayerPath(goal, order.type === "move" ? 0 : reach);
+    order.planned = { x: goal.x, y: goal.y };
+    order.plannedAt = now;
+    if (!order.route) { tellPlayer("Caminho bloqueado."); clearPlayerOrder(); return; }
+  }
+  while (order.route.length && Math.hypot(order.route[0].x - player.x, order.route[0].y - player.y) <= 0.35) order.route.shift();
+  if (!order.route.length) return;
+  for (let index = order.route.length - 1; index > 0; index--) {
+    if (playerPathClear(player, order.route[index])) { order.route.splice(0, index); break; }
+  }
+  const next = order.route[0], dx = next.x - player.x, dy = next.y - player.y;
+  lastDirection = Math.atan2(dy, dx);
+  if (dx) facing = dx < 0 ? -1 : 1;
+  // A fresh obstruction waits for the bounded replan instead of sliding into it.
+  if (playerPathClear(player, next)) move(player, dx, dy, Math.min(dt, Math.hypot(dx, dy) / speed));
+}
+
+function drawPlayerOrder() {
+  if (!playerOrder) return;
+  const target = playerOrder.target;
+  ctx.save();
+  ctx.strokeStyle = playerOrder.type === "attack" ? "#dd8060bb" : "#ebc988bb";
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.ellipse(target.x, target.y, playerOrder.type === "attack" ? 9 : 5, 2.5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function enemyAt(point) {
+  return [...floor.enemies].sort((a, b) => b.y - a.y).find(target => {
+    const height = enemyArtData[target.type]?.height ?? 25;
+    return target.health > 0 && Math.abs(point.x - target.x) <= Math.max(10, height * .55) &&
+      point.y >= target.y - height && point.y <= target.y + 3;
+  });
+}
+
+canvas.addEventListener("pointermove", event => {
+  if (player && !game.hidden) mousePoint = worldPoint(event);
+});
+canvas.addEventListener("pointerdown", event => {
+  if (event.button !== 2 || game.hidden || player.finished || inventory.open || itemCatalogDialog.open) return;
+  event.preventDefault(); abilities.cancel(); clearPlayerOrder(); clearSwings();
+});
+canvas.addEventListener("click", event => {
+  if (ignoreWorldClick) { ignoreWorldClick = false; return; }
+  if (event.button !== 0 || game.hidden || player.finished || inventory.open || itemCatalogDialog.open) return;
+  const point = worldPoint(event);
+  if (!point) return;
+  mousePoint = point;
+  // A native double/triple click continues the successful confirmation gesture;
+  // it must not become an auto-attack order after the aim has already closed.
+  if (doubleConfirmationClick && event.detail > 1 &&
+      Math.hypot(event.clientX - doubleConfirmationClick.x, event.clientY - doubleConfirmationClick.y) <= 6) return;
+  doubleConfirmationClick = null;
+  if (abilities.isAiming()) {
+    if (abilities.confirm(point) && swing?.ability) {
+      doubleConfirmationClick = { x: event.clientX, y: event.clientY };
+    }
+    return;
+  }
+  abilities.cancel();
+  clearPlayerOrder();
+  const enemy = enemyAt(point);
+  const drop = enemy ? null : [...floor.drops].reverse().find(target => {
+    const pose = dropPose(target, gameTime);
+    return Math.abs(point.x - pose.x) <= 8 && Math.abs(point.y - (pose.y - 2 - pose.height)) <= 8;
+  });
+  if (enemy) playerOrder = { type: "attack", target: enemy };
+  else if (drop) playerOrder = { type: "pickup", target: drop };
+  else if (floor.tiles[tileAt(point.x, point.y)]) {
+    const goal = clearFloor(point.x, point.y, radius) ? point : tileCenter(tileAt(point.x, point.y));
+    playerOrder = { type: "move", target: goal };
+  }
+  canvas.focus();
+});
 
 function drawInventoryFigure() {
   const ink = inventoryFigureCanvas.getContext("2d");
@@ -851,39 +1224,45 @@ function frame(timestamp) {
   gameTime += dt * 1000;
   const now = gameTime;
   if (!player.finished) {
-    const dx = held("KeyD", "ArrowRight") - held("KeyA", "ArrowLeft");
-    const dy = held("KeyS", "ArrowDown") - held("KeyW", "ArrowUp");
-    if (dx || dy) lastDirection = Math.atan2(dy, dx);
-    if (dx) facing = dx;
     const { x, y } = player;
-    move(player, dx, dy, dt);
+    updatePlayerOrder(now, dt);
     playerMoved = player.x !== x || player.y !== y;
-    stride = dx || dy ? stride + Math.hypot(player.x - x, player.y - y) : 0;
+    stride = playerMoved ? stride + Math.hypot(player.x - x, player.y - y) : 0;
     const { stairs } = floor;
     if (player.x >= stairs.left && player.x <= stairs.right &&
         player.y >= stairs.top && player.y <= stairs.bottom) enterFloor(depth + 1);
   }
   if (swing) {
-    checkSwordHit(now);
+    if (!swing.ability) checkSwordHit(now);
+    if (swing.ability && now - swing.started >= 170 && now < doubleUntil) { swing.started = now; swing.hit = true; }
     if (now - swing.started >= swingDuration) swing = null;
   }
+  abilities.tick(Math.min(dt, 0.05));
   for (const enemy of floor.enemies) updateEnemy(enemy, now, Math.min(dt, 0.05));
-  if (!swing && pendingSwingDirection !== null) {
+  regenerateResources(dt * 1000);
+  if (!swing && pendingSwingDirection !== null && now >= doubleUntil) {
     swing = { direction: pendingSwingDirection, started: now, checked: 0, hit: false,
               x: Math.round(player.x), y: Math.round(player.y) + Math.floor(stride / 6) % 2 };
     pendingSwingDirection = null;
   }
-  const left = Math.max(0, Math.min(world.width - view.width, player.x - view.width / 2));
-  const top = Math.max(0, Math.min(world.height - view.height, player.y - view.height / 2));
+  showHealth();
+  if (now >= feedbackUntil) gameFeedback.hidden = true;
+  updateCamera();
+  const { left, top } = camera;
   ctx.setTransform(pixelsPerUnit, 0, 0, pixelsPerUnit, -left * pixelsPerUnit, -top * pixelsPerUnit);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   drawRoom(now, left, top);
+  drawPlayerOrder();
+  drawDrops(now, "ground");
   const actors = [player, ...floor.enemies].sort((a, b) => a.y - b.y);
   for (const actor of actors) {
     if (actor === player) drawPlayer(now);
     else drawTarget(actor, now);
   }
+  drawDrops(now, "air");
+  abilities.draw(ctx, mousePoint || { x: player.x + Math.cos(lastDirection) * 40,
+    y: player.y + Math.sin(lastDirection) * 40 });
   if (inventory.open) drawInventoryFigure();
   if (!player.finished) requestAnimationFrame(frame);
 }
@@ -891,17 +1270,31 @@ function frame(timestamp) {
 function clearSwings() {
   swing = null;
   pendingSwingDirection = null;
+  doubleConfirmationClick = null;
 }
 
 function showHealth() {
-  const value = `${player.health}/${player.maxHealth}`;
-  healthDisplay.textContent = `Vida ${value}`;
+  const value = `${formatResource(player.health)}/${formatResource(player.maxHealth)}`;
   inventoryHealth.textContent = value;
+  for (const [bar, fill, current, maximum] of [[healthDisplay, healthFill, player.health, player.maxHealth],
+    [energyDisplay, energyFill, player.energy, player.maxEnergy]]) {
+    const amount = Math.max(0, Math.min(maximum, current));
+    bar.setAttribute("aria-valuemax", maximum);
+    bar.setAttribute("aria-valuenow", amount);
+    fill.style.transform = `scaleX(${maximum > 0 ? amount / maximum : 0})`;
+  }
+}
+
+function updateCamera() {
+  camera.left = Math.max(0, Math.min(world.width - view.width, player.x - view.width / 2));
+  camera.top = Math.max(0, Math.min(world.height - view.height, player.y - view.height / 2));
 }
 
 function showCharacterSheet() {
   for (const field of inventory.querySelectorAll("[data-stat]")) {
-    field.textContent = field.dataset.stat === "energy" ? `${player.energy}/${player.maxEnergy}` : player[field.dataset.stat];
+    const value = player[field.dataset.stat];
+    field.textContent = field.dataset.stat === "energy" ? `${formatResource(player.energy)}/${formatResource(player.maxEnergy)}`
+      : typeof value === "number" ? formatResource(value) : value;
   }
   const spells = document.getElementById("inventory-spells");
   spells.replaceChildren(...player.spells.map(name => {
@@ -915,8 +1308,11 @@ function showCharacterSheet() {
 
 function finishRun() {
   player.finished = true;
-  keys.clear();
+  clearPlayerOrder();
   clearSwings();
+  inventoryButton.disabled = true;
+  abilities.clearFloor();
+  abilities.cancel();
   if (inventory.open) inventory.close();
   if (itemCatalogDialog.open) itemCatalogDialog.close();
   end.hidden = false;
@@ -924,11 +1320,28 @@ function finishRun() {
 }
 
 inventory.addEventListener("close", () => {
+  inventoryButton.setAttribute("aria-expanded", "false");
   if (!inventory.open && !game.hidden && !player.finished) canvas.focus();
 });
 
+inventoryButton.addEventListener("click", () => {
+  if (game.hidden || player.finished || itemCatalogDialog.open) return;
+  clearPlayerOrder();
+  clearSwings();
+  abilities.cancel();
+  if (inventory.open) inventory.close();
+  else {
+    showCharacterSheet();
+    inventory.show();
+    inventoryButton.setAttribute("aria-expanded", "true");
+  }
+});
+
 document.addEventListener("pointerdown", event => {
-  if (inventory.open && event.isPrimary && event.button === 0 && !inventory.contains(event.target)) {
+  ignoreWorldClick = false;
+  if (inventory.open && event.isPrimary && event.button === 0 && !inventory.contains(event.target) &&
+      !inventoryButton.contains(event.target)) {
+    ignoreWorldClick = event.target === canvas;
     inventory.close();
   }
 });
@@ -939,18 +1352,22 @@ sellDropzone.addEventListener("drop", event => event.preventDefault());
 
 window.addEventListener("keydown", event => {
   if (game.hidden || player.finished || event.ctrlKey || event.metaKey || event.altKey) return;
+  const skillKey = /^(?:Digit|Numpad)([1-5])$/.exec(event.code);
+  if (skillKey) {
+    if (inventory.open || itemCatalogDialog.open) return;
+    event.preventDefault(); if (!event.repeat) abilities.activate(Number(skillKey[1]) - 1);
+    return;
+  }
+  if (event.code === "KeyR" && !inventory.open && !itemCatalogDialog.open) {
+    event.preventDefault(); if (!event.repeat) abilities.testingRefill(); return;
+  }
+  if (event.code === "Escape" && (abilities.isAiming() || abilities.isPicking())) {
+    event.preventDefault(); abilities.cancel(); return;
+  }
   if (itemCatalogDialog.open && event.target?.closest?.("#item-catalog")) {
     if (event.code === "Escape") {
       event.preventDefault();
       itemCatalogDialog.close();
-    }
-    return;
-  }
-  if (event.code === "KeyI") {
-    event.preventDefault();
-    if (!inventory.open && !event.repeat) {
-      showCharacterSheet();
-      inventory.show();
     }
     return;
   }
@@ -964,23 +1381,19 @@ window.addEventListener("keydown", event => {
     itemCatalogDialog.close();
     return;
   }
-  if (event.code === "Space") {
-    if (inventory.open && event.target?.closest?.("#inventory button")) return;
+  if (event.code === "Escape") {
     event.preventDefault();
-    if (!event.repeat && pendingSwingDirection === null) {
-      const dx = held("KeyD", "ArrowRight") - held("KeyA", "ArrowLeft");
-      const dy = held("KeyS", "ArrowDown") - held("KeyW", "ArrowUp");
-      pendingSwingDirection = dx || dy ? Math.atan2(dy, dx) : lastDirection;
-    }
+    clearPlayerOrder();
+    clearSwings();
     return;
   }
-  if (!directions.has(event.code)) return;
-  event.preventDefault();
-  keys.add(event.code);
+  if (event.target === canvas && ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) event.preventDefault();
 });
-window.addEventListener("keyup", event => keys.delete(event.code));
-window.addEventListener("blur", () => { keys.clear(); clearSwings(); previous = null; });
+window.addEventListener("blur", () => {
+  abilities.cancel(); clearPlayerOrder(); clearSwings(); playerMoved = false; stride = 0; previous = null;
+});
 function enterFloor(number) {
+  abilities.clearFloor(); mousePoint = null; doubleUntil = 0;
   depth = number;
   floor = generateFloor(runSeed, number);
   Object.assign(player, floor.spawn);
@@ -989,12 +1402,15 @@ function enterFloor(number) {
   facing = 1;
   lastDirection = 0;
   idleStarted = null;
+  clearPlayerOrder();
   clearSwings();
   stride = 0;
   previous = null;
+  updateCamera();
 }
 
 function startRun() {
+  abilities.reset();
   if (itemCatalogDialog.open) itemCatalogDialog.close();
   characterCreate.hidden = true;
   game.hidden = false;
@@ -1007,7 +1423,13 @@ function startRun() {
   };
   inventoryView.reset();
   gameTime = 0;
-  keys.clear();
+  regenerationElapsedMs = 0;
+  abilities.reset();
+  clearPlayerOrder();
+  inventoryButton.disabled = false;
+  inventoryButton.setAttribute("aria-expanded", "false");
+  gameFeedback.hidden = true;
+  ignoreWorldClick = false;
   enterFloor(1);
   showHealth();
   end.hidden = true;
@@ -1016,6 +1438,10 @@ function startRun() {
 }
 
 function showMenu() {
+  abilities.cancel();
+  clearPlayerOrder();
+  clearSwings();
+  if (inventory.open) inventory.close();
   if (itemCatalogDialog.open) itemCatalogDialog.close();
   game.hidden = true;
   characterCreate.hidden = true;
@@ -1057,7 +1483,10 @@ document.getElementById("clear-test-bag").addEventListener("click", () => {
 });
 document.getElementById("open-item-catalog").addEventListener("click", () => {
   if (player.finished) return;
-  keys.clear();
+  clearPlayerOrder();
+  clearSwings();
+  abilities.cancel();
+  if (inventory.open) inventory.close();
   catalogFeedback.textContent = "";
   itemCatalogDialog.show();
 });

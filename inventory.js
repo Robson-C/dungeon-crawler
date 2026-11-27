@@ -1,9 +1,5 @@
 "use strict";
 
-const inventoryCatalog = ["head", "weapon", "armor", "necklace", "boots", "ring"]
-  .flatMap(category => itemCatalog.filter(item => item.category === category).slice(0, 3))
-  .concat(gameItems.spear);
-
 function createInventoryView(dialog) {
   const bagGrid = dialog.querySelector("#bag-slots");
   const feedback = dialog.querySelector("#inventory-feedback");
@@ -83,9 +79,7 @@ function createInventoryView(dialog) {
     button.type = "button";
     button.className = "bag-slot";
     bagGrid.append(button);
-    const item = inventoryCatalog[index];
-    return register(button, `Mochila ${index + 1}`, null,
-      item === gameItems.shortSword ? null : item ?? null);
+    return register(button, `Mochila ${index + 1}`);
   });
 
   function draw(slot) {

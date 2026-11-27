@@ -168,7 +168,7 @@ async function setup() {
       loaded.set("assets/"+file.replaceAll("\\","/"), await raster.loadImage(path.join(root,"assets",file)));
     }
   }
-  for (const file of ["items.js","inventory.js","gameplay-art.js","game.js"]) {
+  for (const file of ["items.js","inventory.js","enemy-art-data.js","gameplay-art.js","abilities.js","game.js"]) {
     run(fs.readFileSync(path.join(root,file),"utf8"));
   }
   elements.get("play").dispatch("click");
@@ -178,13 +178,23 @@ async function setup() {
   const weaponSlot = equipment[1];
   const inventory = elements.get("inventory");
   inventory.show();
+  const room = elements.get("room");
+  room.bounds = { left:100, top:80, right:996, bottom:592, width:896, height:512 };
+  function clickWorld(x, y, button = 0, detail = 1) {
+    const camera = run("camera"), view = run("view"), bounds = room.getBoundingClientRect();
+    const event = { button, detail, isPrimary:true,
+      clientX:bounds.left + (x-camera.left)/view.width*bounds.width,
+      clientY:bounds.top + (y-camera.top)/view.height*bounds.height };
+    document.dispatch("pointerdown",{...event,target:room});
+    room.dispatch("click",event);
+  }
   function drag(source, target) {
     source.dispatch("pointerdown", { pointerId:1,isPrimary:true,button:0,clientX:0,clientY:0 });
     document.hit = target;
     inventory.dispatch("pointermove", { pointerId:1,clientX:20,clientY:20 });
     inventory.dispatch("pointerup", { pointerId:1,clientX:20,clientY:20 });
   }
-  return {run,bag,weaponSlot,inventory,drag,elements,equipment,document,window,calls,races,classes,raster,loaded,stats};
+  return {run,bag,weaponSlot,inventory,drag,clickWorld,elements,equipment,document,window,calls,races,classes,raster,loaded,stats};
 }
 
 function itemName(slot) { return slot.attrs["aria-label"]?.split(": ").slice(1).join(": "); }

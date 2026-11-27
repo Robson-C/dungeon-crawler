@@ -15,6 +15,7 @@ O usuário autorizou em 27/11/2026 três conversas no mesmo projeto e repositór
 - O jogo é web estático. Abrir index.html da worktree correta para avaliar a cópia correspondente.
 - Testes locais disponíveis em validation/README.md. Esses testes usam o runtime Node/Canvas já disponível no host Codex e não substituem a conferência visual.
 - Atualizar a revisão operacional da própria worktree após mudança material, com escopo aprovado, arquivos, testes executados, limitações e reversão.
+- Valores visíveis de atributos e recursos usam somente inteiros arredondados para baixo. Preservar frações nos cálculos internos de regeneração, custos e dano; as barras continuam sem números.
 - Alterações das outras frentes só entram nesta cópia por integração explícita. Conferir a base antes de integrar e preservar alterações locais.
 
 ## Git
@@ -24,4 +25,5 @@ O usuário autorizou em 27/11/2026 três conversas no mesmo projeto e repositór
 - Não executar merges, rebase, reset destrutivo, limpeza de arquivos ou troca de branch nas outras worktrees por iniciativa própria. Integração de funcionalidade e publicação exigem escopo próprio aprovado pelo usuário.
 - Enviar ao remoto somente uma versão completa, revista e validada dentro do fluxo de aprovação já existente.
 - A conversa Principal centraliza a integração. Quando o usuário pedir importar, conferir as Frentes 2 e 3 e integrar na própria worktree da Principal, preservando as cópias de origem.
+- Neste projeto, pedidos como junte ou junte as correções sempre significam conferir e importar as alterações concluídas das outras conversas, Frentes 2 e 3. Não interpretar como apenas agrupar mudanças da Principal. Esse pedido autoriza a integração local e seus testes, sem novo pedido de confirmação do mesmo fluxo; publicação exige pedido próprio.
 - Quando o usuário pedir subir ao GitHub, esse pedido autoriza primeiro conferir e integrar as mudanças concluídas das Frentes 2 e 3, revisar e testar o conjunto e só então publicar. Não solicitar novamente a autorização desse fluxo já definido. Conflitos de intenção, dúvidas ou trabalho incompleto exigem esclarecimento antes do envio; não excluir silenciosamente uma frente pendente para publicar uma versão parcial.

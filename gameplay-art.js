@@ -47,6 +47,7 @@ function createGameplayArt() {
   const adventurerAttackBody = new Image();
   const itemSprites = new Map();
   const characterSheets = new Map();
+  const enemySheets = new Map();
   const directionalSlasher = new Image();
   const props = new Image();
   let terrainCache = null;
@@ -89,6 +90,49 @@ function createGameplayArt() {
       characterSheets.set(key, image);
     }
     return characterSheets.get(key);
+  }
+
+  function enemyView(direction) {
+    const octant = (Math.round(direction / (Math.PI / 4)) + 8) % 8;
+    const rows = [0, 3, 1, 3, 0, 4, 2, 4];
+    return { row: rows[octant], facing: octant >= 3 && octant <= 5 ? -1 : 1 };
+  }
+
+  function enemyPose(target) {
+    if (target.state === "windup") return 5;
+    if (target.state === "recovery") {
+      const elapsed = Math.max(0, (target.recoveryDuration ?? .75) - target.remaining);
+      if (elapsed < .18) return 6;
+      if (elapsed < .5) return 7;
+      return 0;
+    }
+    return target.moving ? 1 + Math.floor((target.stride ?? 0) / 3.5) % 4 : 0;
+  }
+
+  function enemy(context, target, now) {
+    const definition = enemyArtData[target.type];
+    if (!definition) return false;
+    if (!enemySheets.has(target.type)) {
+      const image = new Image();
+      image.src = definition.image;
+      enemySheets.set(target.type, image);
+    }
+    const image = enemySheets.get(target.type);
+    if (!ready(image)) return false;
+    const direction = target.state === "windup" || target.state === "recovery"
+      ? target.direction : target.lookDirection ?? target.direction;
+    const view = enemyView(direction);
+    const pose = enemyPose(target);
+    const frame = definition.frames[view.row * 8 + pose];
+    const scale = definition.height / definition.referenceHeight;
+    context.save();
+    context.fillStyle = "#07111666";
+    context.beginPath();
+    context.ellipse(target.x, target.y, 5.5, 1.8, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+    return drawFigure(context, image, frame, scale, frame.ground, target.x, target.y,
+      view.facing, now < target.flashUntil);
   }
 
   function terrainTile(context, index, x, y, width, height) {
@@ -655,5 +699,5 @@ function createGameplayArt() {
   }
 
   return { appearance, room, actor, weapon, run, directional, slash, guardian, adventurer,
-    character, prepareCharacter, equippedWeapon };
+    character, prepareCharacter, equippedWeapon, enemy, enemyView, enemyPose };
 }

@@ -32,6 +32,8 @@ As três conversas não publicam automaticamente no GitHub. O commit inicial e o
 
 Regra definida pelo usuário em 27/11/2026. Esta conversa é a Principal. Quando o usuário solicitar integração, a Principal verifica as Frentes 2 e 3 e importa as mudanças concluídas na sua própria worktree. Quando solicitar subir ao GitHub, o pedido inclui conferir e reunir o trabalho das três frentes antes do envio, revisar conflitos e executar os testes pertinentes do conjunto.
 
+O usuário esclareceu depois que junte sempre significa trazer as correções das outras conversas do projeto, Frentes 2 e 3. Conferir as duas mesmo quando uma delas não tiver mudança nova. O pedido não autoriza push por si só nem aplicação de propostas ainda não aprovadas ou implementadas nas frentes.
+
 Esse pedido dispensa nova confirmação para repetir as etapas já autorizadas de conferência, integração e publicação. Se houver trabalho incompleto, conflito de intenção ou dúvida sobre uma alteração, a Principal deve perguntar ao usuário e aguardar antes de publicar. Não publicar uma versão parcial omitindo silenciosamente mudanças de uma das frentes. Nenhum arquivo das worktrees de origem será sobrescrito como forma de integração.
 
 ## Validação da organização
@@ -49,3 +51,17 @@ A indisponibilidade do navegador interno e as pendências conhecidas de habilida
 - Chaos Crawl — Frente 3 — 01a21e09-8a0d-7441-bcee-b89522ff9be7
 
 As entradas antigas com falha não geraram histórico persistido e não foram apagadas por alteração de banco ou transcrição. Foram substituídas por estas duas derivações operacionais.
+
+## Integração local das funcionalidades — 27/11/2026
+
+Por pedido explícito do usuário para puxar as duas frentes e testar tudo junto, a Principal importou a versão local das dez habilidades da Frente 2 e dos cinco inimigos animados da Frente 3. As duas branches de origem ainda estavam em 6115270 com alterações não commitadas. A importação usou snapshots desses arquivos, preservando o conteúdo local da Principal e sem gravar nas outras worktrees. Não houve merge de branches nem push.
+
+Na Principal prevalecem os controles por mouse já aprovados, com coleta e barras sem números. Os controles alternativos por WASD/Espaço/I que existiam na Frente 2 não foram reintroduzidos. As habilidades receberam a ligação necessária ao drop e à transição de morte. Os novos inimigos receberam as interações de gelo/isca. A Frente 3 estava ociosa, com o último turno interrompido depois de testes locais aprovados e antes do fechamento; a Principal concluiu sua própria revisão e testes de integração, sem declarar conclusão na conversa de origem. A conferência visual no navegador continua pendente.
+
+Backup e snapshots são retornados por git rev-parse --git-path codex-backups/integracao-frentes-20261127. A revisão operacional da Principal registra arquivos, ajustes de integração, evidências e limitações. Para testar o conjunto, abrir C:/Users/robson.colaco/.codex/worktrees/chaos-principal/dungeon-crawler/index.html; abrir as outras worktrees continua mostrando as versões isoladas. Mudanças futuras nas frentes exigem uma nova importação explícita.
+
+## Segunda importação de correções — 27/11/2026
+
+O pedido junte as correções das outras conversas importou as etapas concluídas de regeneração e acabamento de miras da Frente 2. A Frente 3 não tinha diferenças de arquivos em relação ao snapshot anterior; os valores novos de dano estavam somente propostos e aguardando aprovação na conversa de origem, portanto não havia alteração aplicada para importar. Não foram enviados comandos de trabalho às frentes nem modificadas suas cópias.
+
+Na Principal continuam os acabamentos de Pele de Ferro/Golpe Circular, os controles por mouse, o bloqueio de mira sem energia e de interações nativas em toda a página. Barras continuam sem números; frações da regeneração são exibidas apenas na ficha do inventário. O backup completo anterior e snapshots das duas fontes são retornados por git rev-parse --git-path codex-backups/integracao-correcoes-frentes-20261127. Esta importação é local, sem push; qualquer atualização posterior nas frentes exige outra conferência.

@@ -1,0 +1,29 @@
+{
+  "tool": "image_gen.imagegen",
+  "mode": "built-in",
+  "transparent_background": true,
+  "reference": "assets/gameplay-actors.png",
+  "base": "Use case: stylized-concept. Asset type: static enemy concept sprite for Chaos Crawl. The attached actor atlas is STYLE REFERENCE ONLY: match its painted, richly shaded 2D fantasy game illustration, clear silhouette and lightly stylized proportions. Not pixel art, not 3D render, no photorealism. Single full-body creature, three-quarter side view facing right, camera slightly above as in a top-down action RPG, feet on a common ground plane. Neutral combat-ready idle pose. Centered with generous margins, genuine transparent RGBA background, no scene, no text, no UI, no ground pedestal, no cast shadow on a surface. Strong readable shapes at roughly 70 pixels tall in-game, tasteful detail at full size. This is an initial weak/basic variant, no fire or advanced armor. ",
+  "variants": [
+    {
+      "id": "esqueleto-sem-cabeca",
+      "prompt": "A headless animated human skeleton, anatomically coherent rib cage, spine ending in a short blunt neck stump, no skull anywhere and no gore. Ivory weathered bones, thin ragged brown waistcloth, subtle dull turquoise glimmer INSIDE the rib cage, bent knees and bony hands held forward to claw. No weapon. Recognizable headless silhouette, not a head hidden in a helmet."
+    },
+    {
+      "id": "gosma",
+      "prompt": "A squat small green slime monster, irregular domed gelatinous body, two simple pale luminous eyes embedded inside, a few bubbles and darker core visible through moss green translucent gel. Uneven lobed base, a small forward protrusion suggesting it can lunge. Creature should feel like a fantasy game enemy rather than a cute toy. No legs, no armor, no skull or accessories."
+    },
+    {
+      "id": "rato",
+      "prompt": "A lean oversized brown-gray rat creature, full quadruped body and long bare curved tail, scruffy fur, pinkish ears and paws, small incisors visible, hunched shoulders and alert forward stance. All four legs distinguishable naturally, no human hands. A dangerous scavenger but initial weak version: no giant spikes, corruption, armor or accessories."
+    },
+    {
+      "id": "carapaca",
+      "prompt": "A low broad stone beetle monster with exactly six sturdy insect legs, two small antennae, paired dark stone elytra divided along the back, rock-like segmented shell with a few muted ochre chips and cracks, small pale teal eyes. Organic beetle silhouette underneath a mineral carapace. Stocky resistant basic creature, not a turtle or humanoid, no crystals or flames yet."
+    },
+    {
+      "id": "armadura-possuida",
+      "prompt": "An animated incomplete empty suit of rusty medieval armor, stout humanoid silhouette, battered open-faced helmet with black emptiness inside and two tiny subdued teal pinpoints, asymmetrical rusty shoulder plates, chest plate, gauntlets and greaves separated by visibly empty dark gaps, torn brown waistcloth. One hand holds a short worn iron mace down at its side, the other empty. No flesh, skeleton, shield, floating loose objects or excessive aura. Initial worn variant, heavy and readable."
+    }
+  ]
+}

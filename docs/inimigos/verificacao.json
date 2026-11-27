@@ -1,0 +1,76 @@
+{
+  "result": "passed",
+  "scope": "Dimensions, alpha, nonempty content and source hashes; proposed display size only",
+  "images": [
+    {
+      "id": "esqueleto-sem-cabeca",
+      "width": 1312,
+      "height": 1199,
+      "clearFraction": 0.8413623395512521,
+      "visibleBounds": {
+        "left": 310,
+        "top": 160,
+        "width": 759,
+        "height": 898
+      },
+      "sha256": "fb734877069461c8d2474184c84f8811a14a0bcdb9abdaf24f3a9c2a7e754a2f",
+      "proposedDisplayHeight": 70
+    },
+    {
+      "id": "gosma",
+      "width": 1536,
+      "height": 1024,
+      "clearFraction": 0.8461627960205078,
+      "visibleBounds": {
+        "left": 362,
+        "top": 259,
+        "width": 787,
+        "height": 464
+      },
+      "sha256": "99497665a57679ba6ec19bcb33f215fd996856f83230fbd524782bf5fd03d01d",
+      "proposedDisplayHeight": 34
+    },
+    {
+      "id": "rato",
+      "width": 1774,
+      "height": 887,
+      "clearFraction": 0.8215251236385775,
+      "visibleBounds": {
+        "left": 324,
+        "top": 213,
+        "width": 1091,
+        "height": 532
+      },
+      "sha256": "247f75e956be72b114151825cc8d92de26a16d8976b60a0c8a8fc818e96074d7",
+      "proposedDisplayHeight": 42
+    },
+    {
+      "id": "carapaca",
+      "width": 1536,
+      "height": 1024,
+      "clearFraction": 0.7434418996175131,
+      "visibleBounds": {
+        "left": 275,
+        "top": 180,
+        "width": 995,
+        "height": 664
+      },
+      "sha256": "aa9dd4b7ffe3b36a1bace89496464d175fe09aff96ba5c11e9921ee9efe64850",
+      "proposedDisplayHeight": 44
+    },
+    {
+      "id": "armadura-possuida",
+      "width": 1312,
+      "height": 1199,
+      "clearFraction": 0.7196552258996318,
+      "visibleBounds": {
+        "left": 239,
+        "top": 77,
+        "width": 753,
+        "height": 1044
+      },
+      "sha256": "7805d2d9256cf7f38033e77ce34549d6b9f82139a6e07952582335d8904b530e",
+      "proposedDisplayHeight": 82
+    }
+  ]
+}

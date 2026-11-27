@@ -1,18 +1,14 @@
 @container (min-width: 701px) {
-  #inventory, .ability-bar {
-    --ability-size: clamp(38px, 5cqw, 58px);
-  }
-
   #inventory {
     /* Fit the illustrated panel above the real ability bar inside the room. */
     --art-unit: min(
       (100cqw - 40px) / 1298,
-      ((100cqw - 12px) * 4 / 7 - var(--ability-size) - 48px) / 812
+      ((100cqw - 12px) * 4 / 7 - var(--hud-height) - 28px - var(--inventory-extra-height)) / 812
     );
     --inventory-extra-height: clamp(12px, 2cqw, 24px);
     position: absolute;
     z-index: 2;
-    inset: 12px 0 calc(var(--ability-size) + 28px);
+    inset: 12px 0 calc(var(--hud-height) + 28px);
     width: calc(1298 * var(--art-unit));
     height: calc(812 * var(--art-unit) + var(--inventory-extra-height));
     max-height: none;
@@ -190,25 +186,6 @@
   #inventory .inventory-icon { width: 96%; pointer-events: none; }
   #inventory .equipment-slot .inventory-icon { width: auto; height: 100%; }
 
-  .ability-bar {
-    z-index: 1;
-    inset: auto 0 12px;
-    grid-template-columns: repeat(5, var(--ability-size));
-    width: max-content;
-    gap: clamp(5px, .75cqw, 9px);
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-  }
-  .ability-bar span {
-    width: var(--ability-size);
-    height: var(--ability-size);
-    background-image: url("assets/inventory-desktop.png");
-    background-size: 1706.6667% 1137.7778%;
-    background-position: 35.9613% 94.2184%;
-    clip-path: polygon(12% 1%, 88% 1%, 99% 12%, 99% 88%, 88% 99%, 12% 99%, 1% 88%, 1% 12%);
-  }
 }
 
 @media (min-width: 900px) {
