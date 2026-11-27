@@ -193,6 +193,7 @@ function generateFloor(seed, number) {
   do {
     layout = populateFloor(integer);
   } while (!layout);
+  layout.appearance = gameplayArt.appearance(seed, number);
   return layout;
 }
 
@@ -274,6 +275,13 @@ const healthDisplay = document.getElementById("health");
 const inventoryHealth = document.getElementById("inventory-health");
 const inventory = document.getElementById("inventory");
 const inventoryView = createInventoryView(inventory);
+const inventoryFigure = document.getElementById("inventory-portrait");
+const inventoryFigureCanvas = document.createElement("canvas");
+inventoryFigureCanvas.width = 160;
+inventoryFigureCanvas.height = 144;
+inventoryFigureCanvas.hidden = true;
+inventoryFigureCanvas.setAttribute("aria-hidden", "true");
+inventoryFigure.append(inventoryFigureCanvas);
 const reset = document.getElementById("reset");
 const keys = new Set();
 const directions = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
@@ -283,6 +291,7 @@ let gameTime = 0;
 let facing = 1;
 let stride = 0;
 let playerMoved = false;
+let idleStarted = null;
 let lastDirection = 0;
 let swing = null;
 let pendingSwingDirection = null;
@@ -426,11 +435,17 @@ const hurtSprite = document.createElement("canvas");
 hurtSprite.width = adventurer.width;
 hurtSprite.height = adventurer.height;
 const hurtCtx = hurtSprite.getContext("2d");
+function characterSelection() {
+  return {
+    race: characterCreate.querySelector('[name="race"]:checked'),
+    characterClass: characterCreate.querySelector('[name="class"]:checked')
+  };
+}
+
 function updateCharacter() {
-  const head = characterCreate.querySelector('[name="head"]:checked');
-  const body = characterCreate.querySelector('[name="body"]:checked');
-  const rows = (head.value === "human" ? humanHead : goblinHead)
-    .concat(body.value === "cloak" ? cloakedBody : armoredBody);
+  const { race, characterClass } = characterSelection();
+  const rows = (race.value === "human" ? humanHead : goblinHead)
+    .concat(characterClass.value === "adventurer" ? cloakedBody : armoredBody);
   sprite.clearRect(0, 0, adventurer.width, adventurer.height);
   rows.forEach((row, y) => {
     Array.from(row).forEach((pixel, x) => {
@@ -445,11 +460,12 @@ function updateCharacter() {
   hurtCtx.fillStyle = "#ffe8cc";
   hurtCtx.fillRect(0, 0, hurtSprite.width, hurtSprite.height);
   const preview = document.getElementById("preview");
-  preview.dataset.appearance = `${head.value}-${body.value}`;
+  const inventoryPortrait = document.getElementById("inventory-portrait");
+  preview.dataset.appearance = inventoryPortrait.dataset.appearance = `${race.value}-${characterClass.value}`;
   const initialHealth = `${playerMaxHealth}/${playerMaxHealth}`;
   document.getElementById("creation-health").textContent = initialHealth;
-  const appearance = `Cabeça ${head.labels[0].textContent.trim()}, corpo com ${body.labels[0].textContent.trim()}`;
-  adventurer.setAttribute("aria-label", appearance);
+  const appearance = `Raça ${race.labels[0].textContent.trim()}, classe ${characterClass.labels[0].textContent.trim()}`;
+  inventoryPortrait.setAttribute("aria-label", appearance);
   preview.setAttribute("aria-label", appearance);
 }
 
@@ -466,8 +482,10 @@ function bladePose(x, y, elapsed) {
 
 // Keep the original sampled trail for the remaining pixel sprites.
 function drawSwing(x, y, elapsed) {
+  const item = inventoryView.getEquipped("weapon");
+  if (!item) return;
   const { phase, sweep, angle, reach, cx, cy } = bladePose(x, y, elapsed);
-  if (document.getElementById("preview").dataset.appearance === "human-cloak") {
+  if (player.race === "human" && player.characterClass === "adventurer") {
     ctx.save();
     ctx.translate(cx, cy);
     if (phase > .15 && phase < .86) {
@@ -478,7 +496,7 @@ function drawSwing(x, y, elapsed) {
       ctx.stroke();
     }
     ctx.restore();
-    gameplayArt.weapon(ctx, cx, cy, angle, reach, false, true);
+    gameplayArt.equippedWeapon(ctx, item, cx, cy, angle);
     return;
   }
 
@@ -492,11 +510,7 @@ function drawSwing(x, y, elapsed) {
     mark(reach, angle - offset, 1, "#ffe2a9");
     mark(reach - 2, angle - offset, 1, "#aab7a285");
   }
-  for (let i = 3; i <= reach; i++) {
-    mark(i, angle, i < reach - 1 ? 2 : 1, i < 6 ? "#856345" : "#cbd4c4");
-  }
-  mark(5, angle, 3, "#cf9f61");
-  mark(reach, angle, 1, "#fff2d7");
+  gameplayArt.equippedWeapon(ctx, item, cx, cy, angle);
 }
 
 function clearPath(a, b, padding) {
@@ -645,9 +659,34 @@ function checkSwordHit(now) {
 }
 
 function drawPlayer(now) {
+  if (playerMoved || swing || player.finished || player.race !== "human") {
+    idleStarted = null;
+    return drawPlayerPose(now);
+  }
+
+  idleStarted ??= now;
+  const breath = (1 - Math.cos((now - idleStarted) * 2 * Math.PI / 3000)) / 2;
+  // Keep the feet planted and the sword in the hand by drawing both in the same transform.
+  ctx.save();
+  ctx.translate(0, player.y);
+  ctx.scale(1, 1 + 0.045 * breath);
+  ctx.translate(0, -player.y);
+  drawPlayerPose(now);
+  ctx.restore();
+}
+
+function drawPlayerPose(now) {
   const x = Math.round(player.x), y = Math.round(player.y);
   const flashing = now < player.flashUntil && Math.floor((player.flashUntil - now) / 60) % 2 === 1;
-  if (document.getElementById("preview").dataset.appearance === "human-cloak") {
+  if (player.race === "human" && player.characterClass === "guardian") {
+    const blade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
+    if (gameplayArt.guardian(ctx, player.x, player.y, swing?.direction ?? lastDirection,
+        playerMoved, stride, flashing, blade, inventoryView.getEquipped("weapon"))) return;
+  }
+  if (player.race === "human" && player.characterClass === "adventurer") {
+    const cartoonBlade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
+    if (gameplayArt.adventurer(ctx, player.x, player.y, swing?.direction ?? lastDirection,
+        playerMoved, stride, flashing, cartoonBlade, inventoryView.getEquipped("weapon"))) return;
     if (swing) {
       const blade = bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
       const sign = Math.abs(swing.direction) > Math.PI / 2 ? -1 : 1;
@@ -691,9 +730,7 @@ function drawPlayer(now) {
   ctx.drawImage(flashing ? hurtSprite : adventurer, -7, -17 + bob * 0.5, 14, 17);
   if (!swing) {
     const handY = -6 + bob * 0.5;
-    rect(4.5, handY - 9, 1.5, 7.5, "#cbd0bd");
-    rect(4, handY - 1.5, 3, 1, "#c89457");
-    rect(5, handY - 0.5, 1, 1.5, "#856345");
+    gameplayArt.equippedWeapon(ctx, inventoryView.getEquipped("weapon"), 5, handY, -Math.PI / 4);
   }
   ctx.restore();
   if (swing) {
@@ -702,6 +739,24 @@ function drawPlayer(now) {
 }
 
 function held(first, second) { return Number(keys.has(first) || keys.has(second)); }
+
+function drawInventoryFigure() {
+  if (player.race !== "human") {
+    inventoryFigure.removeAttribute("data-rendered");
+    inventoryFigureCanvas.hidden = true;
+    return;
+  }
+  const ink = inventoryFigureCanvas.getContext("2d");
+  ink.resetTransform();
+  ink.clearRect(0, 0, 160, 144);
+  const scale = 118 / 21;
+  ink.scale(scale, scale);
+  const paint = player.characterClass === "guardian" ? gameplayArt.guardian : gameplayArt.adventurer;
+  const painted = paint(ink, 80 / scale, 132 / scale, 0, false, 0, false, null,
+    inventoryView.getEquipped("weapon"));
+  inventoryFigure.toggleAttribute("data-rendered", painted);
+  inventoryFigureCanvas.hidden = !painted;
+}
 
 function frame(timestamp) {
   if (game.hidden) return;
@@ -743,6 +798,7 @@ function frame(timestamp) {
     if (actor === player) drawPlayer(now);
     else drawTarget(actor, now);
   }
+  if (inventory.open) drawInventoryFigure();
   if (!player.finished) requestAnimationFrame(frame);
 }
 
@@ -768,6 +824,7 @@ function showCharacterSheet() {
     return entry;
   }));
   document.getElementById("no-spells").hidden = player.spells.length > 0;
+  drawInventoryFigure();
 }
 
 function finishRun() {
@@ -783,22 +840,29 @@ inventory.addEventListener("close", () => {
   if (!inventory.open && !game.hidden && !player.finished) canvas.focus();
 });
 
+document.addEventListener("pointerdown", event => {
+  if (inventory.open && event.isPrimary && event.button === 0 && !inventory.contains(event.target)) {
+    inventory.close();
+  }
+});
+
 const sellDropzone = document.getElementById("sell-dropzone");
 sellDropzone.addEventListener("dragover", event => event.preventDefault());
 sellDropzone.addEventListener("drop", event => event.preventDefault());
 
 window.addEventListener("keydown", event => {
   if (game.hidden || player.finished || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.code === "KeyI" || (inventory.open && event.code === "Escape")) {
+  if (event.code === "KeyI") {
     event.preventDefault();
-    if (event.repeat) return;
-    if (inventory.open) {
-      inventory.close();
-    } else {
+    if (!inventory.open && !event.repeat) {
       showCharacterSheet();
       inventory.show();
-      document.getElementById("inventory-title").focus();
     }
+    return;
+  }
+  if (event.code === "Escape" && inventory.open) {
+    event.preventDefault();
+    inventory.close();
     return;
   }
   if (event.code === "Space") {
@@ -825,6 +889,7 @@ function enterFloor(number) {
   document.getElementById("floor-number").textContent = String(depth).padStart(2, "0");
   facing = 1;
   lastDirection = 0;
+  idleStarted = null;
   clearSwings();
   stride = 0;
   previous = null;
@@ -834,7 +899,9 @@ function startRun() {
   characterCreate.hidden = true;
   game.hidden = false;
   runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const { race, characterClass } = characterSelection();
   player = {
+    race: race.value, characterClass: characterClass.value,
     health: playerMaxHealth, finished: false, level: 1, xp: 0, manaPearls: 0, spells: [],
     magic: 0, armor: 0, strength: 0, stamina: 0, willpower: 0, intellect: 0,
     fireResistance: 0, iceResistance: 0, poisonResistance: 0, lightningResistance: 0

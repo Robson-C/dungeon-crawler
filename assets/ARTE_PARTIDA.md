@@ -25,3 +25,108 @@ Selecionar **Humana + Capa** para usar o primeiro personagem ilustrado durante a
 O quadro passou a 1792 × 1024 mantendo o tamanho externo e o mundo lógico. O terreno é rasterizado uma vez por andar num cache de 3584 × 2048 (28 MiB de pixels RGBA), reaproveitado nos quadros seguintes. As coordenadas visuais permitem frações para suavizar a câmera. Velocidades, colisões, alcance e dano continuam nas regras anteriores.
 
 A validação isolada e duas cenas rasterizadas estão na pasta `../../validacao-arte-partida/`. Essa rasterização usa as funções reais do jogo com DOM simulado e Canvas local; não é captura do navegador. A aparência da página inteira e a fluidez no navegador continuam pendentes.
+
+## Reforma visual do cenário — 26/11/2026
+
+O cenário usa lajes maiores, pedras talhadas com bordas gastas e tochas em bronze com luz âmbar, seguindo a arte aprovada do inventário. A integração usa o ImageGen integrado.
+
+| Arquivo | Conteúdo | Resolução |
+| --- | --- | --- |
+| `gameplay-terrain-carved.png` | Atlas 2 × 2 com duas variações de piso, parede frontal e escada | 1254 × 1254 |
+| `gameplay-wall-torch.png` | Tocha individual com suporte e transparência real | 1086 × 1448 |
+
+A alteração de código fica na criação das imagens de cenário e nos métodos `buildTerrain` e `room` de `gameplay-art.js`. Cada amostra de piso cobre 3 × 3 células lógicas. As paredes usam fatias de uma textura de três células de largura, com coroamento desenhado dentro das células sólidas. As superfícies superiores recebem textura escurecida, e sombras suaves marcam o encontro com o piso. A escada usa o recorte da moldura de pedra do novo atlas. As tochas e a luz são desenhadas na região visível. O terreno continua rasterizado no cache de 3584 × 2048 por andar.
+
+Para integrar com o trabalho paralelo de sprites, combine somente os trechos de terreno e tocha desta reforma. Os métodos de animação, os recortes dos atores e as imagens dos personagens pertencem ao trabalho de sprites.
+
+### Cantos e junções
+
+O coroamento das paredes considera as quatro células vizinhas e as quatro diagonais. Uma máscara com quatro subdivisões por célula conecta os trechos horizontais e verticais através dos cantos sólidos. A textura cobre toda essa superfície de uma vez, e o chanfro acompanha seu perímetro exposto. As faces frontais e os encontros em T seguem essa mesma máscara.
+
+Nas extremidades de uma face frontal, o coroamento lateral termina na faixa superior. A alvenaria desenha o restante da face. A validação dos oito formatos também verifica essa terminação para evitar prolongamentos verticais sobre a alvenaria.
+
+Os testes verificaram sala retangular, sala em L, encontro em T, pilar de quatro faces, corredor com terminação, reentrância, escalonamento e contato diagonal. As superfícies conectadas formaram os contornos esperados, com todos os segmentos dentro de células sólidas. Cinco mapas gerados também foram renderizados, além de conferir a abertura do inventário e uma passagem de andar pela escada. A construção do cache com os cantos ficou entre 131 e 162 ms no Chrome headless com GPU desabilitada.
+
+### Validação desta reforma
+
+Capturas reais do Chrome cobriram os andares 1, 2 e 8, a escada, o mapa completo e o inventário aberto sobre o cenário. Uma caminhada até a escada do andar 8 avançou ao andar 9. O ataque também foi exercitado pela tecla Espaço.
+
+Cinco seeds de teste (`0`, `1`, `1957`, `471836`, `4294967295`) produziram cenários renderizados com todas as células caminháveis conectadas. A renderização preservou o conteúdo da matriz de terreno. No Chrome headless com GPU desabilitada, a construção do cache ficou entre 87 e 96 ms por andar e as chamadas seguintes ao desenho do cenário ficaram, em média, entre 1,9 e 2,9 ms. A tocha foi verificada como RGBA com valores de alpha entre 0 e 255.
+
+### Prompt final do atlas
+
+Create a production game environment texture atlas for Chaos Crawl, a 2D top-down dungeon crawler. Input image 1 is the approved inventory art, a STYLE REFERENCE ONLY. Match its stylized hand-painted dark fantasy stone, beautifully beveled chunky shapes, controlled brushwork, charcoal/slate blue-green, worn warm ochre stone edges, and readable cartoon illustration finish. The map will have real moving characters and procedural geometry; this output must be modular texture artwork.
+EXACT LAYOUT: one square image, FOUR EQUAL square cells, in a 2 by 2 grid. Each quadrant fills its cell completely, no padding, no separators, no margin.
+TOP LEFT: seamless TOP-DOWN dungeon floor texture. Around 3 to 4 large irregular rectangular flagstones across and 3 to 4 across height, naturally staggered. Mostly quiet dark desaturated teal gray stone with soft broad brush shading, rounded/chipped bevels, subtle cracks, low contrast grout. Large simple slabs, generous calm surfaces. Equally bright everywhere; no vignette or directional perspective. Match left-right and top-bottom edges to tile seamlessly. No gold outlines, ornaments, moss bushes, holes, debris or objects.
+TOP RIGHT: matching seamless floor VARIANT, same scale and value and edge compatibility. Use different large stone proportions and restrained warm gray variation on a few slabs, some diagonally chipped corners. Similar calm readability.
+BOTTOM LEFT: a straight FRONT FACING dungeon WALL segment, square texture. TOP QUARTER is the flat overhead coping/top face of thick wall, worn slate stone with ochre catching edges. BOTTOM THREE QUARTERS is vertical face with two rows of large bold hand-cut gray stone blocks. Solid rectangular continuous masonry filling all edges. Simple readable blocks, gentle ambient shadow at foot. Perfect horizontal repeat at both ends. Orthographic square grid compatible, straight horizontal lines, no isometric skew.
+BOTTOM RIGHT: a clearly readable rectangular staircase descending NORTH into a dungeon opening, seen from above at a slight elevated RPG angle. Five broad descending steps, chunky beveled stone rim, discreet warm brass corner details, deep desaturated teal shadow near top. The opening occupies 85 percent of the square. Surround it with the same floor slate as the upper textures. Straight geometry aligned to image axes.
+Output only the full-bleed texture atlas. No interface, text, labels, characters, torches, frames around atlas cells, grids, arrows, symbols, lighting beams, photographic realism or render of a whole room. All four cells opaque.
+
+### Prompt final da tocha
+
+Create one production-ready 2D WALL TORCH sprite for Chaos Crawl, matching the stylized hand-painted chunky dark stone and bronze style of the approved inventory in input image 1 (STYLE REFERENCE ONLY). A single upright medieval sconce with a small black wrought iron mounting plate, warm worn brass cup and bracket, short dark timber shaft, and an elegant amber/orange/yellow flame. Slightly elevated RPG view compatible with top-down dungeon walls. Clearly readable silhouette and thick stylized bevels, subtle broad brush shading, polished fantasy game item illustration. Entire object centered upright, fully visible including mounting bracket and flame. Portrait canvas with generous fully transparent padding. Sprite about 65 percent canvas width, 85 percent height. Brass subdued, flame luminous warm amber. Genuine transparent alpha around every outer edge and between the bracket and shaft. The only pixels outside the torch are transparent. No wall, stone panel, floor, background glow, smoke cloud, text, UI, border, multiple objects or scenery.
+
+## Materiais variados por andar — 26/11/2026
+
+Os andares usam três conjuntos com superfícies suaves e juntas discretas, produzidos pelo ImageGen integrado a partir da referência aprovada do inventário.
+
+| Arquivo | Material | Resolução |
+| --- | --- | --- |
+| `gameplay-terrain-slate.png` | Lajes escuras de ardósia, faces amplas e desgaste discreto | 1254 × 1254 |
+| `gameplay-terrain-limestone.png` | Pedra clara envelhecida, piso de grandes placas e paredes de alvenaria | 1254 × 1254 |
+| `gameplay-terrain-earth.png` | Terra compactada com pedras esparsas e paredes rochosas | 1254 × 1254 |
+
+Cada atlas contém duas amostras de piso, a parede frontal e a escada correspondente ao material. A amostragem do piso exclui a faixa divisória do atlas para obter emendas limpas.
+
+### Seleção e integração
+
+`gameplayArt.appearance(seed, number)` gera o objeto `appearance` com índice de material e seed visual. `generateFloor` adiciona esses dados depois de completar `populateFloor`. A sequência cosmética utiliza estado próprio. Cada passo escolhe um dos outros dois materiais, oferecendo uma sequência reproduzível para cada seed.
+
+A seed visual determina a escala e o deslocamento das amostras, a distribuição de desgaste ocasional e o deslocamento da alvenaria. Cada conjunto também fornece cores de sombra e chanfro. Os dados de configuração, o carregamento dos três atlas e a renderização ficam em `gameplay-art.js`. O terreno é rasterizado quando mudam as células, o material ou a seed visual. Dados de andares anteriores sem `appearance` usam ardósia como apresentação padrão.
+
+Ao integrar com o trabalho paralelo, preserve os métodos de personagens, equipamentos e armas existentes em `gameplay-art.js` e combine somente a configuração de terreno, os métodos de cenário e o novo campo em `generateFloor`.
+
+### Validação dos materiais
+
+- Uma comparação de 25 combinações de seed e andar com a versão anterior confirmou a mesma geometria, entrada, escada e distribuição de inimigos. A assinatura SHA-256 foi `c03f858dfc30993c98112317154aa93c8fd47f12c7546a222064438a2b09f5d8`.
+- Foram verificadas 600 aparências, com reprodução idêntica pela seed, três materiais disponíveis e alternância entre andares consecutivos.
+- Os oito formatos de canto foram exercitados nos três materiais, totalizando 24 combinações, incluindo terminações frontais. Os contornos ficaram conectados nas células sólidas.
+- A troca de material e de seed visual com a mesma matriz de células reconstruiu o cache. Chamadas seguintes reaproveitaram o terreno. Andares sem metadados visuais também foram desenhados.
+- Capturas do Chrome cobriram comparação do mesmo trecho nos três materiais e seis andares consecutivos. As escadas foram atravessadas com os três materiais. Movimento, ataque e abertura do inventário também foram exercitados.
+- No Chrome headless com GPU desabilitada, a construção do cache ficou entre 99 e 148 ms. O desenho posterior do cenário em um canvas de 1792 × 1024 com escala 4× ficou em torno de 5,8 ms por chamada.
+
+### Prompts finais dos materiais
+
+#### slate
+
+Produce a production texture atlas for a 2D top-down dungeon crawler. Image 1 is a STYLE REFERENCE for painted fantasy materials only. Deliver ONE square image divided into FOUR EXACT equal square quadrants, 2 columns by 2 rows. Full bleed with no margin or gutters.
+This environment is walked over for many hours. PRIORITY: CALM, LOW-CONTRAST WALKABLE SURFACES with very sparse wear. Use broad smooth painted shapes and restrained material detail. The reference's dark fantasy crafted illustration style should come through in shading and stone shapes, with much quieter floor surfaces. Mortar lines must be extremely thin, shallow and CLOSE IN VALUE to the stone. No black outline around every stone, no golden outlining, no dense cracks or mosaic of little rocks, no noisy high frequency surface. Uniform diffuse illumination.
+QUADRANT ROLES:
+TOP LEFT: seamless top-down repeating floor material, as described below. Large calm surface areas. No frame, objects or perspective. Left-right and top-bottom matching edges.
+TOP RIGHT: a second matching seamless floor swatch, same average hue, brightness, material size and edges as top left, with sparse local wear or a few subtly changed shapes. This is an occasional variation, not a different checkerboard color.
+BOTTOM LEFT: straight orthographic front-facing wall material filling the quadrant. TOP QUARTER is a flat broad coping surface of the same stone, continuous and quiet. BOTTOM THREE QUARTERS are the wall's vertical masonry, two rows of broad blocks. Compatible with horizontal repeat, no skew or isometric angle.
+BOTTOM RIGHT: square downward stair opening with 5 broad steps descending north into shadow, viewed as a slightly elevated top-down RPG sprite. A restrained matching masonry rim, opening centered, fills 88 percent of cell. A little of the floor material surrounds it. No gold ornamental corners. All four quadrants completely opaque, flush to each edge. No text, UI, labels, torches, props, characters, decoration, large crevices, vegetation clumps or mockup of a room.
+MATERIAL DIRECTION: Worn DARK SLATE FLAGSTONES. Desaturated smoky graphite, soft blue-gray and a touch of muted green. The floor is mostly flat, lightly burnished slate in large simple rectangular slabs with softened nearly invisible joints, about 3 slabs across each swatch, offset arrangement. At least 90 percent of each slab is an uninterrupted flat gently shaded face. Very occasional hairline scratch. The second swatch adds restrained polished wear, never extra dark cracks. Walls are broad charcoal slate blocks with softly rounded edges and subdued silver-gray bevels. Calm and understated. No copper or gold vein outlines.
+
+#### limestone
+
+Produce a production texture atlas for a 2D top-down dungeon crawler. Image 1 is a STYLE REFERENCE for painted fantasy materials only. Deliver ONE square image divided into FOUR EXACT equal square quadrants, 2 columns by 2 rows. Full bleed with no margin or gutters.
+This environment is walked over for many hours. PRIORITY: CALM, LOW-CONTRAST WALKABLE SURFACES with very sparse wear. Use broad smooth painted shapes and restrained material detail. The reference's dark fantasy crafted illustration style should come through in shading and stone shapes, with much quieter floor surfaces. Mortar lines must be extremely thin, shallow and CLOSE IN VALUE to the stone. No black outline around every stone, no golden outlining, no dense cracks or mosaic of little rocks, no noisy high frequency surface. Uniform diffuse illumination.
+QUADRANT ROLES:
+TOP LEFT: seamless top-down repeating floor material, as described below. Large calm surface areas. No frame, objects or perspective. Left-right and top-bottom matching edges.
+TOP RIGHT: a second matching seamless floor swatch, same average hue, brightness, material size and edges as top left, with sparse local wear or a few subtly changed shapes. This is an occasional variation, not a different checkerboard color.
+BOTTOM LEFT: straight orthographic front-facing wall material filling the quadrant. TOP QUARTER is a flat broad coping surface of the same stone, continuous and quiet. BOTTOM THREE QUARTERS are the wall's vertical masonry, two rows of broad blocks. Compatible with horizontal repeat, no skew or isometric angle.
+BOTTOM RIGHT: square downward stair opening with 5 broad steps descending north into shadow, viewed as a slightly elevated top-down RPG sprite. A restrained matching masonry rim, opening centered, fills 88 percent of cell. A little of the floor material surrounds it. No gold ornamental corners. All four quadrants completely opaque, flush to each edge. No text, UI, labels, torches, props, characters, decoration, large crevices, vegetation clumps or mockup of a room.
+MATERIAL DIRECTION: ANCIENT PALE LIMESTONE AND ASHLAR. Warm dusty gray-beige and desaturated sandy stone, medium lightness (not white), distinct from blue slate. Floor of very large smooth time-worn limestone pavers, 2 or 3 across each swatch, fine barely visible sand-colored seams, subtly irregular offset lengths. Faint warm patches of age, mostly broad open smooth surfaces. No repeating dramatic cracks, no rounded cobblestones. Second floor swatch very faint lightly dusty wear. Walls broad pale warm-gray ashlar blocks with softened corners and old sand-colored mortar. Stair rim in the same limestone. Should have architectural elegance, quiet enough to focus on a small moving character.
+
+#### earth
+
+Produce a production texture atlas for a 2D top-down dungeon crawler. Image 1 is a STYLE REFERENCE for painted fantasy materials only. Deliver ONE square image divided into FOUR EXACT equal square quadrants, 2 columns by 2 rows. Full bleed with no margin or gutters.
+This environment is walked over for many hours. PRIORITY: CALM, LOW-CONTRAST WALKABLE SURFACES with very sparse wear. Use broad smooth painted shapes and restrained material detail. The reference's dark fantasy crafted illustration style should come through in shading and stone shapes, with much quieter floor surfaces. Mortar lines must be extremely thin, shallow and CLOSE IN VALUE to the stone. No black outline around every stone, no golden outlining, no dense cracks or mosaic of little rocks, no noisy high frequency surface. Uniform diffuse illumination.
+QUADRANT ROLES:
+TOP LEFT: seamless top-down repeating floor material, as described below. Large calm surface areas. No frame, objects or perspective. Left-right and top-bottom matching edges.
+TOP RIGHT: a second matching seamless floor swatch, same average hue, brightness, material size and edges as top left, with sparse local wear or a few subtly changed shapes. This is an occasional variation, not a different checkerboard color.
+BOTTOM LEFT: straight orthographic front-facing wall material filling the quadrant. TOP QUARTER is a flat broad coping surface of the same stone, continuous and quiet. BOTTOM THREE QUARTERS are the wall's vertical masonry, two rows of broad blocks. Compatible with horizontal repeat, no skew or isometric angle.
+BOTTOM RIGHT: square downward stair opening with 5 broad steps descending north into shadow, viewed as a slightly elevated top-down RPG sprite. A restrained matching masonry rim, opening centered, fills 88 percent of cell. A little of the floor material surrounds it. No gold ornamental corners. All four quadrants completely opaque, flush to each edge. No text, UI, labels, torches, props, characters, decoration, large crevices, vegetation clumps or mockup of a room.
+MATERIAL DIRECTION: UNDERGROUND EARTH AND SPARSE EMBEDDED FLAT STONES. The floor is predominantly quiet compacted matte earth, medium dark desaturated umber with muted olive-gray shadows, gently broad brushed continuous ground, not a stone pavement. Only two or three widely separated flush half-buried flat stones in a whole floor swatch, low contrast with the earth; stones occupy under 15 percent of the floor. No gravel speckle, roots, grass tufts, holes or scattered items. Second floor swatch has a faint warmer compacted soil patch and one sparse flat stone. Earth edge tiling must be seamless. Walls are substantial cool brown-gray natural rock blocks with softly hand-hewn faces and very restrained muted moss in a few mortar seams. Coping is flat worn rock. Staircase is weathered gray-brown rock.

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chaos Crawl</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="inventory-desktop.css">
+  <script src="items.js" defer></script>
   <script src="inventory.js" defer></script>
   <script src="gameplay-art.js" defer></script>
   <script src="game.js" defer></script>
@@ -39,14 +41,16 @@
       </dl>
       <p class="creation-accessible">Títulos: 12 espaços bloqueados.</p>
       <div class="customize">
-        <div id="preview" data-appearance="human-cloak" role="img" aria-label="Prévia do personagem"></div>
-        <fieldset class="creation-head"><legend class="creation-accessible">Cabeça</legend>
-          <label><input type="radio" name="head" value="human" checked><span>Humana</span></label>
-          <label><input type="radio" name="head" value="goblin"><span>Goblin</span></label>
+        <div id="preview" class="character-art" data-appearance="human-adventurer" role="img" aria-label="Prévia do personagem"></div>
+        <fieldset class="creation-race">
+          <legend>Raça</legend>
+          <label><input type="radio" name="race" value="human" checked><span>Humana</span></label>
+          <label><input type="radio" name="race" value="goblin"><span>Goblin</span></label>
         </fieldset>
-        <fieldset class="creation-body"><legend class="creation-accessible">Corpo</legend>
-          <label><input type="radio" name="body" value="cloak" checked><span>Capa</span></label>
-          <label><input type="radio" name="body" value="armor"><span>Armadura</span></label>
+        <fieldset class="creation-class">
+          <legend>Classe</legend>
+          <label><input type="radio" name="class" value="adventurer" checked><span>Aventureiro</span></label>
+          <label><input type="radio" name="class" value="guardian"><span>Guardião</span></label>
         </fieldset>
       </div>
       <div class="character-actions">
@@ -59,7 +63,7 @@
       <p>Use <kbd>WASD</kbd> ou as <kbd>setas</kbd> para andar. Aperte <kbd>Espaço</kbd> para atacar na direção do movimento.</p>
       <p>Quando o inimigo levantar a lança, recue. Você começa com três pontos de vida.</p>
       <p>Explore as salas e pise na escada para descer. Você pode deixar inimigos para trás.</p>
-      <p>Aperte <kbd>I</kbd> para abrir ou fechar o inventário. Os inimigos podem atacar enquanto você consulta a mochila.</p>
+      <p>Aperte <kbd>I</kbd> para abrir o inventário. Pressione <kbd>Esc</kbd> ou clique fora para fechar. Os inimigos continuam ativos.</p>
       <form method="dialog"><button>Voltar</button></form>
     </dialog>
     <div id="game" hidden>
@@ -80,13 +84,9 @@
           <button type="button" id="back-menu">Menu principal</button>
         </div>
       </div>
-    <dialog id="inventory" aria-labelledby="inventory-title">
-      <div class="inventory-header">
-        <h2 id="inventory-title" tabindex="-1">Inventário</h2>
-        <form method="dialog"><button type="submit">Fechar</button></form>
-        <p class="inventory-feedback" id="inventory-feedback" role="status"></p>
-      </div>
-      <div class="inventory-content">
+    <dialog id="inventory" aria-label="Inventário">
+      <p class="inventory-feedback" id="inventory-feedback" role="status"></p>
+      <div class="inventory-content" tabindex="-1" autofocus>
         <div class="inventory-character">
           <section class="character-equipment" aria-labelledby="equipment-title">
             <h3 id="equipment-title">Equipamento</h3>
@@ -94,7 +94,8 @@
               <button type="button" class="equipment-slot" data-equipment="head">Elmo</button>
               <button type="button" class="equipment-slot" data-equipment="weapon">Arma</button>
               <div class="equipment-preview">
-                <canvas id="equipped-character" width="28" height="34" role="img" aria-label="Personagem"></canvas>
+                <div id="inventory-portrait" class="character-art" role="img" aria-label="Personagem"></div>
+                <canvas id="equipped-character" width="28" height="34" hidden></canvas>
               </div>
               <button type="button" class="equipment-slot" data-equipment="armor">Armadura</button>
               <button type="button" class="equipment-slot" data-equipment="necklace">Colar</button>
@@ -128,12 +129,14 @@
           </div>
         </div>
         <div class="inventory-storage">
-          <p class="wealth"><strong data-stat="manaPearls"></strong> Pérolas de Mana</p>
-          <div class="sell-area" id="sell-dropzone">
-            <strong>Vender itens</strong>
-            <span>Arraste o item aqui</span>
+          <div class="inventory-trade">
+            <p class="wealth"><strong data-stat="manaPearls"></strong> Pérolas de Mana</p>
+            <div class="sell-area" id="sell-dropzone">
+              <strong>Vender itens</strong>
+              <span>Arraste aqui</span>
+            </div>
           </div>
-          <section aria-labelledby="bag-title">
+          <section class="inventory-bag" aria-labelledby="bag-title">
             <h3 id="bag-title">Mochila</h3>
             <div id="bag-slots" role="group" aria-labelledby="bag-title"></div>
           </section>

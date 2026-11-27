@@ -1,6 +1,8 @@
 "use strict";
 
-// Rows and columns match the 40 × 40 tiles in assets/inventory-items.png.
+// Item icons are sampled individually from the approved artwork.
+const referenceIconColumns = [662, 783, 903, 1023, 1143, 1259];
+const referenceIconRows = [302, 423, 543];
 const inventoryCatalog = [
   ["head", "Elmo com viseira", "Elmo de chifres", "Capuz em runas"],
   ["weapon", "Espada de guarda reta", "Sabre de lâmina curva", "Espada de cristal"],
@@ -8,23 +10,29 @@ const inventoryCatalog = [
   ["necklace", "Presa em cordão", "Medalhão solar", "Pingente de jade"],
   ["boots", "Botas de montaria", "Botas de placas", "Botas de tecido"],
   ["ring", "Sinete de bronze", "Aro de espinhos", "Anel de jade"]
-].flatMap(([category, ...names], row) => names.map((name, column) => ({
-  category, name, iconPosition: `${column * 50}% ${row * 20}%`
-})));
+].flatMap(([category, ...names], row) => names.map((name, column) => {
+  if (category === "weapon" && column === 0) return gameItems.shortSword;
+  const x = referenceIconColumns[(row % 2) * 3 + column];
+  const y = referenceIconRows[Math.floor(row / 2)];
+  return {
+    category, name,
+    iconPosition: `${column * 50}% ${row * 20}%`,
+    referenceIconPosition: `${100 * x / (1536 - 96)}% ${100 * y / (1024 - 96)}%`
+  };
+})).concat(Object.values(gameItems).filter(item => item !== gameItems.shortSword));
 
 function createInventoryView(dialog) {
   const bagGrid = dialog.querySelector("#bag-slots");
   const feedback = dialog.querySelector("#inventory-feedback");
-  const header = dialog.querySelector(".inventory-header");
   const slotsByButton = new WeakMap();
   let selected = null;
   let drag = null;
 
-  function register(button, label, category = null) {
+  function register(button, label, category = null, initialItem = null) {
     const icon = document.createElement("span");
     icon.className = "inventory-icon";
     icon.setAttribute("aria-hidden", "true");
-    const slot = { button, icon, label, category, item: null };
+    const slot = { button, icon, label, category, initialItem, item: initialItem };
     slotsByButton.set(button, slot);
     button.addEventListener("click", event => {
       if (event.detail === 0) activate(slot);
@@ -34,14 +42,17 @@ function createInventoryView(dialog) {
   }
 
   const equipment = Array.from(dialog.querySelectorAll("[data-equipment]"), button =>
-    register(button, button.textContent.trim(), button.dataset.equipment)
+    register(button, button.textContent.trim(), button.dataset.equipment,
+      button.dataset.equipment === "weapon" ? gameItems.shortSword : null)
   );
   const bag = Array.from({ length: 24 }, (_, index) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "bag-slot";
     bagGrid.append(button);
-    return register(button, `Mochila ${index + 1}`);
+    const item = inventoryCatalog[index];
+    return register(button, `Mochila ${index + 1}`, null,
+      item === gameItems.shortSword ? null : item ?? null);
   });
 
   function draw(slot) {
@@ -51,10 +62,19 @@ function createInventoryView(dialog) {
     button.toggleAttribute("data-occupied", Boolean(item));
     button.title = item ? item.name : label;
     if (item) {
-      icon.style.backgroundPosition = item.iconPosition;
+      icon.className = "inventory-icon";
+      icon.style.background = item.icon ? `url("${item.icon}") center / contain no-repeat` : "";
+      icon.style.maskImage = item.icon ? "none" : "";
+      icon.style.rotate = item.icon ? "-45deg" : "";
+      icon.style.setProperty("--painted-icon-position", item.iconPosition ?? "0% 0%");
+      icon.style.setProperty("--reference-icon-position", item.referenceIconPosition ?? "0% 0%");
+      button.replaceChildren(icon);
+    } else if (category) {
+      icon.className = "equipment-placeholder";
+      icon.removeAttribute("style");
       button.replaceChildren(icon);
     } else {
-      button.textContent = category ? label : "";
+      button.replaceChildren();
     }
   }
 
@@ -108,7 +128,7 @@ function createInventoryView(dialog) {
     if (drag || !dialog.open || !source.item || !event.isPrimary || event.button !== 0) return;
     const { pointerId, clientX: x, clientY: y } = event;
     source.button.setPointerCapture(pointerId);
-    drag = { source, pointerId, startX: x, startY: y, x, y, ghost: null, target: null, frame: null };
+    drag = { source, pointerId, startX: x, startY: y, x, y, ghost: null, target: null };
   }
 
   function slotAt(x, y) {
@@ -125,23 +145,6 @@ function createInventoryView(dialog) {
     target?.button.classList.add("inventory-drop-target");
   }
 
-  function scrollDrag() {
-    if (!drag?.ghost) return;
-    if (dialog.scrollHeight > dialog.clientHeight) {
-      const { left, right, bottom } = dialog.getBoundingClientRect();
-      const top = header.getBoundingClientRect().bottom;
-      const edge = Math.min(28, (bottom - top) / 3);
-      const { x, y } = drag;
-      if (edge > 0 && x >= left && x <= right && y >= top - edge && y <= bottom + edge) {
-        const before = dialog.scrollTop;
-        if (y < top + edge) dialog.scrollTop -= 6;
-        else if (y > bottom - edge) dialog.scrollTop += 6;
-        if (dialog.scrollTop !== before) highlightTarget();
-      }
-    }
-    drag.frame = requestAnimationFrame(scrollDrag);
-  }
-
   function moveDrag(event) {
     if (!drag || drag.pointerId !== event.pointerId) return;
     drag.x = event.clientX;
@@ -150,12 +153,13 @@ function createInventoryView(dialog) {
       if (Math.hypot(drag.x - drag.startX, drag.y - drag.startY) < 5) return;
       select(null);
       const { button, icon } = drag.source;
+      const iconStyle = getComputedStyle(icon);
       drag.ghost = icon.cloneNode(true);
       drag.ghost.classList.add("inventory-drag-ghost");
-      drag.ghost.style.width = `${icon.getBoundingClientRect().width}px`;
+      drag.ghost.style.width = iconStyle.width;
+      drag.ghost.style.height = iconStyle.height;
       document.body.append(drag.ghost);
       button.classList.add("inventory-drag-source");
-      drag.frame = requestAnimationFrame(scrollDrag);
     }
     drag.ghost.style.left = `${drag.x}px`;
     drag.ghost.style.top = `${drag.y}px`;
@@ -164,12 +168,11 @@ function createInventoryView(dialog) {
 
   function clearDrag() {
     if (!drag) return;
-    const { source, ghost, target, frame, pointerId } = drag;
+    const { source, ghost, target, pointerId } = drag;
     drag = null;
     source.button.classList.remove("inventory-drag-source");
     target?.button.classList.remove("inventory-drop-target");
     ghost?.remove();
-    if (frame !== null) cancelAnimationFrame(frame);
     if (source.button.hasPointerCapture(pointerId)) source.button.releasePointerCapture(pointerId);
   }
 
@@ -193,17 +196,16 @@ function createInventoryView(dialog) {
     feedback.textContent = "";
   });
   return {
+    getEquipped(category) {
+      return equipment.find(slot => slot.category === category)?.item ?? null;
+    },
     reset() {
       clearDrag();
       select(null);
-      for (const slot of equipment) {
-        slot.item = null;
+      for (const slot of [...equipment, ...bag]) {
+        slot.item = slot.initialItem;
         draw(slot);
       }
-      bag.forEach((slot, index) => {
-        slot.item = inventoryCatalog[index] ?? null;
-        draw(slot);
-      });
       feedback.textContent = "";
     }
   };

@@ -25,34 +25,155 @@ const gameplayPropFrames = [
 
 // Illustration only: world coordinates and collision footprints remain in game.js.
 function createGameplayArt() {
-  const terrain = new Image();
+  const terrainThemes = [
+    { id: "slate", patchTiles: 4, solid: "#0b12199e", light: "#aca99b73", shade: "#050c14b0", shadow: "#070e16" },
+    { id: "limestone", patchTiles: 3, solid: "#27261fa6", light: "#d7cfb875", shade: "#171b15b0", shadow: "#242118" },
+    { id: "earth", patchTiles: 4, solid: "#131c16a6", light: "#aaa68a73", shade: "#07110ab0", shadow: "#15160f" }
+  ].map(theme => {
+    const image = new Image();
+    image.src = `assets/gameplay-terrain-${theme.id}.png`;
+    return { ...theme, image };
+  });
+  let terrain = terrainThemes[0].image;
+  const wallTorch = new Image();
   const actors = new Image();
   const runner = new Image();
   const verticalRunner = new Image();
   const diagonalRunner = new Image();
   const slasher = new Image();
+  const guardianSheet = new Image();
+  const guardianAttackBody = new Image();
+  const adventurerSheet = new Image();
+  const adventurerAttackBody = new Image();
+  const itemSprites = new Map();
   const directionalSlasher = new Image();
   const props = new Image();
   let terrainCache = null;
   let cachedTiles = null;
+  let cachedTheme = null;
+  let cachedVisualSeed = null;
+  const defaultAppearance = { theme: 0, seed: 0 };
   const cacheScale = 4;
   const ready = image => image.complete && image.naturalWidth > 0;
-  terrain.src = "assets/gameplay-terrain.png";
+  wallTorch.src = "assets/gameplay-wall-torch.png";
   actors.src = "assets/gameplay-actors.png";
   runner.src = "assets/player-run.png";
   verticalRunner.src = "assets/player-vertical.png";
   diagonalRunner.src = "assets/player-diagonal.png";
   slasher.src = "assets/player-slash.png";
+  guardianSheet.src = "assets/human-guardian-body.webp";
+  guardianAttackBody.src = "assets/human-guardian-body-slash.webp";
+  adventurerSheet.src = "assets/human-adventurer-cartoon.webp";
+  adventurerAttackBody.src = "assets/human-adventurer-body-slash.webp";
+  itemSprite(gameItems.shortSword);
   directionalSlasher.src = "assets/player-directional-slash.webp";
   props.src = "assets/gameplay-props.png";
 
-  function terrainTile(context, index, x, y, width, height) {
-    const size = terrain.naturalWidth / 2;
-    context.drawImage(terrain, (index % 2) * size, Math.floor(index / 2) * size,
-      size, size, x, y, width, height);
+  function itemSprite(item) {
+    if (!item) return null;
+    const path = item.weaponSprite || gameItems.shortSword.weaponSprite;
+    if (!itemSprites.has(path)) {
+      const image = new Image();
+      image.src = path;
+      itemSprites.set(path, image);
+    }
+    return itemSprites.get(path);
   }
 
-  function buildTerrain(tiles, columns, rows, tileSize) {
+  function terrainTile(context, index, x, y, width, height) {
+    const size = terrain.naturalWidth / 2;
+    // Exclude the atlas dividers from repeated floor swatches.
+    const inset = size * .008;
+    context.drawImage(terrain, (index % 2) * size + inset, Math.floor(index / 2) * size + inset,
+      size - inset * 2, size - inset * 2, x, y, width, height);
+  }
+
+  function appearance(seed, number) {
+    let state = seed >>> 0;
+    let theme = state % terrainThemes.length;
+    // The cosmetic sequence has its own state and can be rebuilt for any floor.
+    // Each step selects one of the other materials.
+    for (let floor = 1; floor < number; floor++) {
+      state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+      theme = (theme + 1 + (state >>> 16) % (terrainThemes.length - 1)) % terrainThemes.length;
+    }
+    return { theme, seed: (seed ^ Math.imul(number, 0x85ebca6b)) >>> 0 };
+  }
+
+  function drawWallCaps(ink, mask, columns, rows, cellSize, theme) {
+    const texture = document.createElement("canvas");
+    texture.width = cellSize * 12 * cacheScale;
+    texture.height = cellSize * 3 * cacheScale;
+    const size = terrain.naturalWidth / 2;
+    texture.getContext("2d").drawImage(terrain, 0, size, size, size / 4,
+      0, 0, texture.width, texture.height);
+    const pattern = ink.createPattern(texture, "repeat");
+    pattern.setTransform(new DOMMatrix().scale(1 / cacheScale));
+    const surface = new Path2D();
+    const light = new Path2D();
+    const shade = new Path2D();
+    const bevel = cellSize * .2;
+
+    // Fill one joined surface. Only its exposed perimeter receives a bevel,
+    // so cell boundaries never become seams between separate wall pieces.
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const id = row * columns + col;
+        if (!mask[id]) continue;
+        const north = row === 0 || !mask[id - columns];
+        const east = col + 1 === columns || !mask[id + 1];
+        const south = row + 1 === rows || !mask[id + columns];
+        const west = col === 0 || !mask[id - 1];
+        const nw = north && west ? bevel : 0;
+        const ne = north && east ? bevel : 0;
+        const se = south && east ? bevel : 0;
+        const sw = south && west ? bevel : 0;
+        const x = col * cellSize, y = row * cellSize;
+        surface.moveTo(x + nw, y);
+        surface.lineTo(x + cellSize - ne, y);
+        surface.lineTo(x + cellSize, y + ne);
+        surface.lineTo(x + cellSize, y + cellSize - se);
+        surface.lineTo(x + cellSize - se, y + cellSize);
+        surface.lineTo(x + sw, y + cellSize);
+        surface.lineTo(x, y + cellSize - sw);
+        surface.lineTo(x, y + nw);
+        surface.closePath();
+        if (north) {
+          light.moveTo(x, y + nw);
+          light.lineTo(x + nw, y);
+          light.lineTo(x + cellSize - ne, y);
+          light.lineTo(x + cellSize, y + ne);
+        }
+        if (west) {
+          light.moveTo(x, y + nw);
+          light.lineTo(x, y + cellSize - sw);
+        }
+        if (south) {
+          shade.moveTo(x, y + cellSize - sw);
+          shade.lineTo(x + sw, y + cellSize);
+          shade.lineTo(x + cellSize - se, y + cellSize);
+          shade.lineTo(x + cellSize, y + cellSize - se);
+        }
+        if (east) {
+          shade.moveTo(x + cellSize, y + ne);
+          shade.lineTo(x + cellSize, y + cellSize - se);
+        }
+      }
+    }
+    ink.save();
+    ink.fillStyle = pattern;
+    ink.fill(surface);
+    ink.lineWidth = .55;
+    ink.lineCap = "round";
+    ink.lineJoin = "round";
+    ink.strokeStyle = theme.light;
+    ink.stroke(light);
+    ink.strokeStyle = theme.shade;
+    ink.stroke(shade);
+    ink.restore();
+  }
+
+  function buildTerrain(tiles, columns, rows, tileSize, theme, visualSeed) {
     terrainCache = document.createElement("canvas");
     terrainCache.width = columns * tileSize * cacheScale;
     terrainCache.height = rows * tileSize * cacheScale;
@@ -60,39 +181,101 @@ function createGameplayArt() {
     ink.scale(cacheScale, cacheScale);
     ink.imageSmoothingEnabled = true;
     ink.imageSmoothingQuality = "high";
-    ink.fillStyle = "#152027";
-    ink.fillRect(0, 0, columns * tileSize, rows * tileSize);
+    // Large quiet surfaces dominate. Sparse wear and the placement/scale of
+    // the material vary with the floor's cosmetic seed.
+    const patchSize = tileSize * (theme.patchTiles + ((visualSeed >>> 20) & 1));
+    const offsetX = (visualSeed >>> 4) % patchSize;
+    const offsetY = (visualSeed >>> 12) % patchSize;
+    for (let y = -offsetY; y < rows * tileSize; y += patchSize) {
+      for (let x = -offsetX; x < columns * tileSize; x += patchSize) {
+        const col = (x + offsetX) / patchSize, row = (y + offsetY) / patchSize;
+        let variation = visualSeed ^ Math.imul(col, 0x9e3779b1) ^ Math.imul(row, 0x85ebca6b);
+        variation = Math.imul(variation ^ (variation >>> 16), 0x45d9f3b) >>> 0;
+        terrainTile(ink, (variation >>> 16) % 5 === 0 ? 1 : 0, x, y, patchSize, patchSize);
+      }
+    }
+    const size = terrain.naturalWidth / 2;
+    const wallSlice = size / 3;
+    const wallOffset = (visualSeed >>> 24) % 3;
+    const capColumns = columns * 4, capRows = rows * 4;
+    const caps = new Uint8Array(capColumns * capRows);
+    const markCap = (col, row, width, height) => {
+      for (let y = row; y < row + height; y++) {
+        caps.fill(1, y * capColumns + col, y * capColumns + col + width);
+      }
+    };
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < columns; col++) {
         const id = row * columns + col;
         const x = col * tileSize, y = row * tileSize;
         if (tiles[id]) {
-          terrainTile(ink, (col * 17 + row * 31) % 2, x, y, tileSize, tileSize);
           if (row > 0 && !tiles[id - columns]) {
-            ink.fillStyle = "#0b161b45";
-            ink.fillRect(x, y, tileSize, 3);
+            const shadow = ink.createLinearGradient(0, y, 0, y + 5);
+            shadow.addColorStop(0, theme.shadow + "80");
+            shadow.addColorStop(1, theme.shadow + "00");
+            ink.fillStyle = shadow;
+            ink.fillRect(x, y, tileSize, 5);
+          }
+          if (col > 0 && !tiles[id - 1]) {
+            const shadow = ink.createLinearGradient(x, 0, x + 3, 0);
+            shadow.addColorStop(0, theme.shadow + "40");
+            shadow.addColorStop(1, theme.shadow + "00");
+            ink.fillStyle = shadow;
+            ink.fillRect(x, y, 3, tileSize);
           }
           continue;
         }
-        if (row + 1 < rows && tiles[id + columns]) {
-          terrainTile(ink, 2, x, y, tileSize, tileSize);
-        } else {
-          // The coping slices occupy the solid tile, never a walkable neighbor.
-          const size = terrain.naturalWidth / 2;
-          const cap = (tx, ty, w, h) => ink.drawImage(terrain, 0, size,
-            size, size / 4, tx, ty, w, h);
-          if (row > 0 && tiles[id - columns]) cap(x, y, tileSize, 4);
-          if (col > 0 && tiles[id - 1]) cap(x, y, 4, tileSize);
-          if (col + 1 < columns && tiles[id + 1]) cap(x + tileSize - 4, y, 4, tileSize);
+        // Solid ground has a subdued stone surface. This also gives narrow
+        // dividing walls a complete top, aligned with their collision cells.
+        ink.fillStyle = theme.solid;
+        ink.fillRect(x, y, tileSize, tileSize);
+        const north = row > 0 && tiles[id - columns];
+        const east = col + 1 < columns && tiles[id + 1];
+        const south = row + 1 < rows && tiles[id + columns];
+        const west = col > 0 && tiles[id - 1];
+        if (south) {
+          ink.drawImage(terrain, ((col + wallOffset) % 3) * wallSlice, size, wallSlice, size,
+            x, y, tileSize, tileSize);
+        }
+        const cx = col * 4, cy = row * 4;
+        if (north || south) markCap(cx, cy, 4, 1);
+        // At a front face, the coping ends at its top. The masonry below
+        // supplies the corner instead of extending the roof down as a post.
+        const sideHeight = south ? 1 : 4;
+        if (west) markCap(cx, cy, 1, sideHeight);
+        if (east) markCap(cx + 3, cy, 1, sideHeight);
+
+        // Diagonal floor cells join the coping through the solid corner.
+        // Northern corners span the height of the front-facing wall.
+        if (!south && !east && row + 1 < rows && col + 1 < columns && tiles[id + columns + 1]) {
+          markCap(cx + 3, cy, 1, 4);
+        }
+        if (!south && !west && row + 1 < rows && col > 0 && tiles[id + columns - 1]) {
+          markCap(cx, cy, 1, 4);
+        }
+        if (!north && !east && row > 0 && col + 1 < columns && tiles[id - columns + 1]) {
+          markCap(cx + 3, cy, 1, 1);
+        }
+        if (!north && !west && row > 0 && col > 0 && tiles[id - columns - 1]) {
+          markCap(cx, cy, 1, 1);
         }
       }
     }
+    drawWallCaps(ink, caps, capColumns, capRows, tileSize / 4, theme);
     cachedTiles = tiles;
+    cachedTheme = theme;
+    cachedVisualSeed = visualSeed;
   }
 
   function room(context, floor, view, left, top, now, columns, rows, tileSize) {
-    if (!ready(terrain)) return false;
-    if (cachedTiles !== floor.tiles) buildTerrain(floor.tiles, columns, rows, tileSize);
+    const floorAppearance = floor.appearance ?? defaultAppearance;
+    const theme = terrainThemes[floorAppearance.theme] ?? terrainThemes[0];
+    if (!ready(theme.image)) return false;
+    terrain = theme.image;
+    const visualSeed = floorAppearance.seed >>> 0;
+    if (cachedTiles !== floor.tiles || cachedTheme !== theme || cachedVisualSeed !== visualSeed) {
+      buildTerrain(floor.tiles, columns, rows, tileSize, theme, visualSeed);
+    }
     context.drawImage(terrainCache, left * cacheScale, top * cacheScale,
       view.width * cacheScale, view.height * cacheScale, left, top, view.width, view.height);
     const firstRow = Math.max(0, Math.floor(top / tileSize) - 2);
@@ -105,11 +288,17 @@ function createGameplayArt() {
         if (floor.tiles[id] || !floor.tiles[id + columns] || (col + row) % 7 !== 0) continue;
         const x = col * tileSize + 8, y = row * tileSize + 10;
         const flicker = Math.sin(now / 170 + col) * .7;
-        const glow = context.createRadialGradient(x, y, 1, x, y, 24 + flicker);
-        glow.addColorStop(0, "#ffc87745");
+        const glow = context.createRadialGradient(x, y, 1, x, y, 30 + flicker);
+        glow.addColorStop(0, "#ffc87766");
+        glow.addColorStop(.4, "#eba23e24");
         glow.addColorStop(1, "#eea04400");
         context.fillStyle = glow;
-        context.fillRect(x - 26, y - 26, 52, 52);
+        context.fillRect(x - 32, y - 32, 64, 64);
+        if (ready(wallTorch)) {
+          const height = 17, width = height * wallTorch.naturalWidth / wallTorch.naturalHeight;
+          context.drawImage(wallTorch, x - width / 2, y - 9, width, height);
+          continue;
+        }
         if (ready(props)) {
           const torch = gameplayPropFrames[2];
           const height = 11, width = height * torch.w / torch.h;
@@ -126,7 +315,9 @@ function createGameplayArt() {
       }
     }
     const { stairs } = floor;
-    terrainTile(context, 3, stairs.left - 3, stairs.top - 4, 38, 36);
+    const size = terrain.naturalWidth / 2;
+    context.drawImage(terrain, size * 1.06, size * 1.05, size * .88, size * .88,
+      stairs.left - 3, stairs.top - 4, 38, 36);
     return true;
   }
 
@@ -259,12 +450,145 @@ function createGameplayArt() {
     const frame = (lateral ? slashFrames : directionalSlashFrames)[row][sign > 0 ? step : 2 - step];
     const scale = lateral ? 21 / 470 : 21 / 232;
     const ground = lateral ? (moving ? 487 : 485) : (moving ? 246 : 240);
+    drawArmedPose(context, sheet, frame, scale, ground, x, y, sign, flashing, blade, direction);
+    return true;
+  }
+
+  // East, south, north, southeast, northeast. Grips and blade angles are
+  // registered to each body drawing and shared by every equipped weapon.
+  const guardianMotionFrames = [
+    [[96,72], [101,76], [103,67], [95,83], [97,71]],
+    [[77,85], [72,84], [64,85], [66,86], [76,83]],
+    [[101,76], [106,52], [106,51], [108,57], [108,52]],
+    [[96,75], [99,78], [99,71], [96,85], [95,76]],
+    [[101,69], [108,55], [104,52], [104,60], [105,58]]
+  ].map((row, r) => row.map(([fistX, fistY], c) => ({
+    x: c * 160, y: r * 144, w: 160, h: 144, anchorX: 80, fistX, fistY,
+    weaponAngle: -Math.PI / 4, weaponBehind: r === 2 || r === 4
+  })));
+
+  // Measured grips for the adventurer's locomotion frames, in the same five views.
+  const adventurerFrames = [
+    [[80,96], [107,88], [108,84], [109,88], [99,88]],
+    [[64,100], [70,91], [65,80], [73,86], [72,100]],
+    [[111,100], [112,89], [104,90], [105,89], [104,88]],
+    [[76,100], [96,100], [95,90], [100,90], [88,100]],
+    [[80,98], [88,94], [106,80], [113,82], [109,86]]
+  ].map((row, r) => row.map(([fistX, fistY], c) => ({
+    x: c * 160, y: r * 144, w: 160, h: 144, anchorX: 80, fistX, fistY,
+    weaponAngle: -Math.PI / 4, weaponBehind: r === 2 || r === 4
+  })));
+  const adventurerAttackFrames = [
+    [[96,96,-55], [108,98,0], [108,126,35], [96,105,-50]],
+    [[81,116,35], [75,125,90], [55,125,150], [80,110,-50]],
+    [[44,68,-140], [89,64,-95], [115,69,-45], [106,87,-60]],
+    [[85,96,-30], [104,112,20], [93,137,55], [104,105,-50]],
+    [[38,71,-150], [112,69,-35], [124,104,10], [108,86,-55]]
+  ].map((row, r) => row.map(([fistX, fistY, angle], c) => ({
+    x: c * 192, y: r * 176, w: 192, h: 176, anchorX: 80, fistX, fistY,
+    weaponAngle: angle * Math.PI / 180, weaponBehind: r === 2 || r === 4
+  })));
+  const guardianAttackFrames = [
+    [[96,94,-55], [108,96,0], [109,126,35], [99,105,-50]],
+    [[77,116,35], [76,112,90], [67,120,150], [83,109,-50]],
+    [[48,69,-140], [90,54,-95], [116,67,-45], [111,87,-60]],
+    [[89,93,-30], [106,112,20], [94,134,55], [106,107,-50]],
+    [[42,71,-150], [110,69,-35], [114,102,10], [110,87,-55]]
+  ].map((row, r) => row.map(([fistX, fistY, angle], c) => ({
+    x: c * 192, y: r * 176, w: 192, h: 176, anchorX: 80, fistX, fistY,
+    weaponAngle: angle * Math.PI / 180, weaponBehind: r === 2 || r === 4
+  })));
+
+  function guardian(context, x, y, direction, moving, stride, flashing, blade, item = gameItems.shortSword) {
+    if (!ready(guardianSheet) || !ready(guardianAttackBody)) return false;
+    const heading = Math.abs(direction);
+    const sign = heading > Math.PI / 2 ? -1 : 1;
+    let row = 0;
+    if (heading === Math.PI / 2) row = direction > 0 ? 1 : 2;
+    else if (heading > 0 && heading < Math.PI) row = direction > 0 ? 3 : 4;
+    const scale = 21 / 118;
+    if (blade || !moving) {
+      let pose = 3;
+      if (blade && blade.phase < .83) {
+        const step = blade.sweep < .22 ? 0 : blade.sweep < .76 ? 1 : 2;
+        pose = sign > 0 ? step : 2 - step;
+      }
+      drawEquippedPose(context, guardianAttackBody, guardianAttackFrames[row][pose],
+        scale, 154, x, y, sign, flashing, item);
+      return true;
+    }
+    const pose = 1 + Math.floor(stride / 9) % 4;
+    drawEquippedPose(context, guardianSheet, guardianMotionFrames[row][pose], scale, 132, x, y, sign, flashing, item);
+    return true;
+  }
+
+  function adventurer(context, x, y, direction, moving, stride, flashing, blade, item = gameItems.shortSword) {
+    if (!ready(adventurerSheet) || !ready(adventurerAttackBody)) return false;
+    const heading = Math.abs(direction);
+    const sign = heading > Math.PI / 2 ? -1 : 1;
+    let row = 0;
+    if (heading === Math.PI / 2) row = direction > 0 ? 1 : 2;
+    else if (heading > 0 && heading < Math.PI) row = direction > 0 ? 3 : 4;
+    const scale = 21 / 118;
+    if (blade || !moving) {
+      let pose = 3;
+      if (blade && blade.phase < .83) {
+        const step = blade.sweep < .22 ? 0 : blade.sweep < .76 ? 1 : 2;
+        pose = sign > 0 ? step : 2 - step;
+      }
+      drawEquippedPose(context, adventurerAttackBody, adventurerAttackFrames[row][pose],
+        scale, 154, x, y, sign, flashing, item);
+      return true;
+    }
+    const frame = adventurerFrames[row][1 + Math.floor(stride / 9) % 4];
+    drawEquippedPose(context, adventurerSheet, frame, scale, 132, x, y, sign, flashing, item);
+    return true;
+  }
+
+  function drawEquippedPose(context, sheet, frame, scale, ground, x, y, sign, flashing, item) {
+    const weapon = itemSprite(item);
+    const showWeapon = weapon && ready(weapon);
+    if (!frame.weaponBehind || !showWeapon) drawFigure(context, sheet, frame, scale, ground, x, y, sign, flashing);
+    if (!showWeapon) return;
+    equippedWeapon(context, item, x + sign * (frame.fistX - frame.anchorX) * scale,
+      y + (frame.fistY - ground) * scale, frame.weaponAngle, flashing, sign);
+    if (frame.weaponBehind) {
+      drawFigure(context, sheet, frame, scale, ground, x, y, sign, flashing);
+      return;
+    }
+    // Fingers cover the grip, preserving the appearance of a held item.
+    context.save();
+    if (flashing) context.globalAlpha = .45;
+    context.translate(x, y);
+    context.scale(sign, 1);
+    context.drawImage(sheet, frame.x + frame.fistX - 5, frame.y + frame.fistY - 5, 10, 10,
+      (frame.fistX - 5 - frame.anchorX) * scale, (frame.fistY - 5 - ground) * scale, 10 * scale, 10 * scale);
+    context.restore();
+  }
+
+  function equippedWeapon(context, item, x, y, angle, flashing = false, facing = 1) {
+    const image = itemSprite(item);
+    if (!image || !ready(image)) return false;
+    context.save();
+    if (flashing) context.globalAlpha = .45;
+    context.translate(x, y);
+    context.scale(facing, 1);
+    context.rotate(angle);
+    const scale = 9.8 / 256;
+    context.drawImage(image, -40 * scale, -80 * scale, 256 * scale, 160 * scale);
+    context.restore();
+    return true;
+  }
+
+  function drawArmedPose(context, sheet, frame, scale, ground, x, y, sign, flashing, blade, direction) {
     const bladeBehind = direction < 0;
     if (!bladeBehind) drawFigure(context, sheet, frame, scale, ground, x, y, sign, flashing);
     const handX = x + sign * (frame.fistX - frame.anchorX) * scale;
     const handY = y + (frame.fistY - ground) * scale;
-    const dx = blade.cx + Math.cos(blade.angle) * blade.reach - handX;
-    const dy = blade.cy + Math.sin(blade.angle) * blade.reach - handY;
+    // During a cut the tip follows the same arc sampled by the hit test.
+    const restAngle = (sign > 0 ? 45 : 115) * Math.PI / 180;
+    const dx = blade ? blade.cx + Math.cos(blade.angle) * blade.reach - handX : 8.75 * Math.cos(restAngle);
+    const dy = blade ? blade.cy + Math.sin(blade.angle) * blade.reach - handY : -8.75 * Math.sin(restAngle);
     const sword = gameplayPropFrames[0];
     const gripFraction = .145;
     const length = Math.hypot(dx, dy) / (1 - gripFraction);
@@ -276,8 +600,7 @@ function createGameplayArt() {
       -gripFraction * length, -sword.axisY * .018, length, sword.h * .018);
     context.restore();
     if (bladeBehind) drawFigure(context, sheet, frame, scale, ground, x, y, sign, flashing);
-    return true;
   }
 
-  return { room, actor, weapon, run, directional, slash };
+  return { appearance, room, actor, weapon, run, directional, slash, guardian, adventurer, equippedWeapon };
 }

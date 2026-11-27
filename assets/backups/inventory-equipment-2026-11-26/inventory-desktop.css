@@ -1,0 +1,222 @@
+@container (min-width: 701px) {
+  #inventory, .ability-bar {
+    --ability-size: clamp(38px, 5cqw, 58px);
+  }
+
+  #inventory {
+    /* Fit the illustrated panel above the real ability bar inside the room. */
+    --art-unit: min(
+      (100cqw - 40px) / 1298,
+      ((100cqw - 12px) * 4 / 7 - var(--ability-size) - 48px) / 812
+    );
+    position: absolute;
+    z-index: 2;
+    inset: 12px 0 calc(var(--ability-size) + 28px);
+    width: calc(1298 * var(--art-unit));
+    height: calc(812 * var(--art-unit));
+    max-height: none;
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: url("assets/inventory-carved-stone.png") right top / 200% 200% no-repeat, #172324;
+    background-clip: padding-box;
+    overflow: clip;
+    font: calc(24 * var(--art-unit))/1.15 Georgia, serif;
+  }
+
+  #inventory::before {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    content: "";
+    border: calc(40 * var(--art-unit)) solid var(--stone-edge);
+    border-image: url("assets/inventory-frame.png") 96 103 stretch;
+    pointer-events: none;
+  }
+
+  #inventory .inventory-content {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    background: none;
+  }
+
+  #inventory :is(.inventory-character, .character-equipment, .equipment-layout,
+    .inventory-storage, .inventory-trade, .inventory-bag) { display: contents; }
+
+  #inventory .inventory-character::after { content: none; }
+
+  /* Positions are local to the panel, independent of the browser window. */
+  #inventory :is(#equipment-title, #bag-title, .equipment-slot, .equipment-preview,
+    .character-status, .wealth, .sell-area, #bag-slots) {
+    position: absolute;
+    inset: calc(var(--y) * var(--art-unit)) auto auto calc(var(--x) * var(--art-unit));
+    width: calc(var(--w) * var(--art-unit));
+    height: calc(var(--h) * var(--art-unit));
+    margin: 0;
+  }
+
+  #inventory :is(#equipment-title, #bag-title) {
+    display: grid;
+    align-items: center;
+    padding: 0 calc(38 * var(--art-unit));
+    max-width: none;
+    color: var(--ivory);
+    font: 600 calc(36 * var(--art-unit))/1 Georgia, serif;
+    text-shadow: 0 2px 3px #090c0c;
+  }
+  #equipment-title { --x: 48; --y: 42; --w: 363; --h: 53; }
+  #bag-title { --x: 521; --y: 184; --w: 294; --h: 58; }
+
+  #inventory .equipment-slot {
+    --x: 52; --w: 118; --h: 70;
+    padding: calc(7 * var(--art-unit));
+    border-radius: 0;
+    font: calc(23 * var(--art-unit))/1 Georgia, serif;
+  }
+  #inventory .equipment-slot:is([data-equipment="weapon"], [data-equipment="necklace"], [data-equipment="ring"]) { --x: 372; }
+  #inventory .equipment-slot:is([data-equipment="head"], [data-equipment="weapon"]) { --y: 116; }
+  #inventory .equipment-slot:is([data-equipment="armor"], [data-equipment="necklace"]) { --y: 192; }
+  #inventory .equipment-slot:is([data-equipment="boots"], [data-equipment="ring"]) { --y: 268; }
+
+  #inventory .equipment-preview {
+    --x: 181; --y: 106; --w: 179; --h: 217;
+    background: url("assets/inventory-carved-stone.png") 12.5% 100% / 280% 220% no-repeat;
+  }
+  #inventory-portrait { bottom: 8%; height: 86%; }
+  #inventory-portrait[data-appearance="human-adventurer"] {
+    aspect-ratio: 10 / 9;
+    height: 77%;
+    background-size: 900% 500%;
+    transform: translateX(-50%);
+  }
+
+  #inventory .character-status {
+    --x: 54; --y: 349; --w: 438; --h: 420;
+    display: grid;
+    grid-template-rows: calc(38 * var(--art-unit)) minmax(0, 1fr) calc(28 * var(--art-unit));
+    gap: calc(5 * var(--art-unit));
+    padding: calc(10 * var(--art-unit)) calc(21 * var(--art-unit));
+    border: calc(18 * var(--art-unit)) solid #8c734d;
+    border-image: url("assets/inventory-frame.png") 96 103 stretch;
+    background: linear-gradient(#091113df, #091113df),
+      url("assets/inventory-carved-stone.png") right top / 200% 200%;
+    box-shadow: 0 2px 5px #080c0c;
+  }
+  #inventory .progression {
+    align-items: center;
+    gap: calc(30 * var(--art-unit));
+    padding: 0;
+    border-bottom: 1px solid #95774888;
+    color: var(--gold);
+    font: inherit;
+  }
+  #inventory .progression div { gap: calc(10 * var(--art-unit)); }
+  #inventory .stat-list {
+    display: grid;
+    grid-template-rows: repeat(11, minmax(0, 1fr));
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+  #inventory .stat-list > div {
+    align-items: center;
+    padding: 0 calc(9 * var(--art-unit));
+    border-bottom: 1px solid #96886b44;
+  }
+  #inventory .stat-list dt { white-space: nowrap; }
+  #inventory .stat-list dd { font-weight: 600; }
+  #inventory .stat-list abbr { display: none; }
+  #inventory .stat-list .resistance-long { display: inline; }
+  #inventory .stat-list :is(.fire, .ice, .poison, .lightning) {
+    border: 1px solid #97754577;
+    clip-path: polygon(2% 0, 98% 0, 100% 50%, 98% 100%, 2% 100%, 0 50%);
+  }
+  #inventory .character-spells {
+    display: flex;
+    align-items: center;
+    gap: calc(8 * var(--art-unit));
+    min-width: 0;
+    padding-left: calc(9 * var(--art-unit));
+  }
+  #inventory .character-spells h3 {
+    margin: 0;
+    padding: 0;
+    background: none;
+    color: var(--ivory);
+    font: inherit;
+  }
+  #inventory #no-spells { color: var(--ivory); }
+  #inventory #inventory-spells li { display: inline; }
+  #inventory #inventory-spells li + li::before { content: ", "; }
+
+  #inventory .wealth {
+    --x: 531; --y: 54; --w: 280; --h: 110;
+    padding: 0;
+    gap: calc(5 * var(--art-unit));
+    color: var(--gold);
+    font: calc(29 * var(--art-unit))/1.1 Georgia, serif;
+  }
+  #inventory .wealth strong { font: 600 calc(40 * var(--art-unit))/1 Georgia, serif; }
+  #inventory .sell-area {
+    --x: 821; --y: 53; --w: 421; --h: 113;
+    min-block-size: 0;
+    gap: calc(7 * var(--art-unit));
+    padding: calc(8 * var(--art-unit));
+    border-width: calc(12 * var(--art-unit));
+    color: var(--ivory);
+    font: calc(27 * var(--art-unit))/1 Georgia, serif;
+  }
+  #inventory .sell-area strong { font: 600 calc(34 * var(--art-unit))/1 Georgia, serif; }
+
+  #inventory #bag-slots {
+    --x: 533; --y: 254; --w: 711; --h: 476;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: calc(6 * var(--art-unit));
+  }
+  #inventory .bag-slot {
+    padding: calc(8 * var(--art-unit));
+    border-radius: 0;
+  }
+  #inventory .inventory-icon { width: 96%; pointer-events: none; }
+  #inventory .equipment-slot .inventory-icon { width: auto; height: 100%; }
+
+  .ability-bar {
+    z-index: 1;
+    inset: auto 0 12px;
+    grid-template-columns: repeat(5, var(--ability-size));
+    width: max-content;
+    gap: clamp(5px, .75cqw, 9px);
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .ability-bar span {
+    width: var(--ability-size);
+    height: var(--ability-size);
+    background-image: url("assets/inventory-desktop.png");
+    background-size: 1706.6667% 1137.7778%;
+    background-position: 35.9613% 94.2184%;
+    clip-path: polygon(12% 1%, 88% 1%, 99% 12%, 99% 88%, 88% 99%, 12% 99%, 1% 88%, 1% 12%);
+  }
+}
+
+@media (min-width: 900px) {
+  /* Only the individual item icons are sampled from the approved art. */
+  #inventory .inventory-icon, .inventory-drag-ghost {
+    background-image: url("assets/inventory-desktop.png");
+    background-size: 1600% 1066.6667%;
+    background-position: var(--reference-icon-position);
+    mask-image: linear-gradient(to right, transparent, #000 8% 92%, transparent),
+      linear-gradient(to bottom, transparent, #000 8% 92%, transparent);
+    mask-composite: intersect;
+    filter: none;
+  }
+}
