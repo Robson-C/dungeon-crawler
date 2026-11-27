@@ -46,6 +46,7 @@ function createGameplayArt() {
   const adventurerSheet = new Image();
   const adventurerAttackBody = new Image();
   const itemSprites = new Map();
+  const characterSheets = new Map();
   const directionalSlasher = new Image();
   const props = new Image();
   let terrainCache = null;
@@ -78,6 +79,16 @@ function createGameplayArt() {
       itemSprites.set(path, image);
     }
     return itemSprites.get(path);
+  }
+
+  function prepareCharacter(race, characterClass) {
+    const key = `${race}-${characterClass}`;
+    if (!characterSheets.has(key)) {
+      const image = new Image();
+      image.src = `assets/characters/${key}.webp`;
+      characterSheets.set(key, image);
+    }
+    return characterSheets.get(key);
   }
 
   function terrainTile(context, index, x, y, width, height) {
@@ -545,6 +556,47 @@ function createGameplayArt() {
     return true;
   }
 
+  // Nine whole-body drawings per view. Columns 1–4 form the running loop.
+  // Columns 5–7 are wind-up/contact/follow-through. Hands are registered locally.
+  const characterGrips = [
+    [[74,98],[108,88],[110,91],[112,95],[106,93],[75,84],[128,68],[130,68],[74,98]],
+    [[61,101],[65,91],[62,83],[66,88],[64,100],[62,91],[61,97],[107,81],[61,101]],
+    [[110,100],[110,85],[110,85],[110,85],[110,85],[116,71],[126,60],[129,60],[110,100]],
+    [[70,100],[95,100],[95,90],[96,97],[86,103],[72,99],[126,79],[130,73],[70,100]],
+    [[78,100],[88,102],[109,85],[115,83],[111,83],[87,83],[127,60],[130,60],[78,100]]
+  ];
+  const goblinFrontGrips = [[51,106],[62,91],[62,83],[65,89],[55,104],[63,91],[82,99],[115,80],[51,106]];
+  const characterAttackAngles = [
+    [-55,0,35], [35,90,150], [-140,-95,-45], [-30,20,55], [-150,-35,10]
+  ];
+
+  function character(context, x, y, race, characterClass, direction, moving, stride, flashing, blade, item) {
+    if (race === "human" && characterClass === "adventurer") {
+      return adventurer(context, x, y, direction, moving, stride, flashing, blade, item);
+    }
+    if (race === "human" && characterClass === "guardian") {
+      return guardian(context, x, y, direction, moving, stride, flashing, blade, item);
+    }
+    const sheet = prepareCharacter(race, characterClass);
+    if (!ready(sheet)) return false;
+    const heading = Math.abs(direction), sign = heading > Math.PI / 2 ? -1 : 1;
+    let row = 0, col = moving ? 1 + Math.floor(stride / 9) % 4 : 0;
+    if (heading === Math.PI / 2) row = direction > 0 ? 1 : 2;
+    else if (heading > 0 && heading < Math.PI) row = direction > 0 ? 3 : 4;
+    let angle = -Math.PI / 4;
+    if (blade && blade.phase < .83) {
+      const phase = blade.sweep < .22 ? 0 : blade.sweep < .76 ? 1 : 2;
+      const pose = sign > 0 ? phase : 2 - phase;
+      col = 5 + pose;
+      angle = characterAttackAngles[row][pose] * Math.PI / 180;
+    }
+    const [fistX, fistY] = race === "goblin" && row === 1 ? goblinFrontGrips[col] : characterGrips[row][col];
+    const frame = {x:col*160,y:row*144,w:160,h:144,anchorX:80,fistX,fistY,
+      weaponAngle:angle,weaponBehind:row===2||row===4};
+    drawEquippedPose(context,sheet,frame,21/118,132,x,y,sign,flashing,item);
+    return true;
+  }
+
   function drawEquippedPose(context, sheet, frame, scale, ground, x, y, sign, flashing, item) {
     const weapon = itemSprite(item);
     const showWeapon = weapon && ready(weapon);
@@ -602,5 +654,6 @@ function createGameplayArt() {
     if (bladeBehind) drawFigure(context, sheet, frame, scale, ground, x, y, sign, flashing);
   }
 
-  return { appearance, room, actor, weapon, run, directional, slash, guardian, adventurer, equippedWeapon };
+  return { appearance, room, actor, weapon, run, directional, slash, guardian, adventurer,
+    character, prepareCharacter, equippedWeapon };
 }

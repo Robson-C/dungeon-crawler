@@ -5,11 +5,44 @@ const tileSize = 16;
 const columns = world.width / tileSize, rows = world.height / tileSize;
 const radius = 5;
 const speed = 72;
-const playerMaxHealth = 3;
+const baseCharacterStats = Object.freeze({
+  health: 100, energy: 100, armor: 10, strength: 10, stamina: 10, willpower: 10, intellect: 10,
+  fireResistance: 0, iceResistance: 0, poisonResistance: 0, lightningResistance: 0
+});
+const raceDefinitions = {
+  human: { name: "Humano", modifiers: {}, description: "Sem bônus ou penalidades." },
+  goblin: { name: "Goblin", modifiers: { health: -20, stamina: 5 },
+    description: "+5 Vigor. −20 Vida." },
+  skeleton: { name: "Esqueleto", modifiers: { armor: -5, willpower: 5 },
+    description: "+5 Vontade. −5 Armadura." },
+  draconic: { name: "Dracônico", modifiers: { health: 20, stamina: 5, intellect: -5, willpower: -5 },
+    description: "+20 Vida e +5 Vigor. −5 Intelecto e Vontade. Habilidade de fogo em breve." }
+};
+const classDefinitions = {
+  adventurer: { name: "Aventureiro", modifiers: { stamina: 5, fireResistance: 10, iceResistance: 10,
+    poisonResistance: 10, lightningResistance: 10 },
+    description: "+5 Vigor e +10 em todas as resistências." },
+  guardian: { name: "Guardião", modifiers: { health: 20, armor: 5 },
+    description: "+20 Vida e +5 Armadura." },
+  elementalist: { name: "Elementalista", modifiers: { fireResistance: 20, iceResistance: 20,
+    poisonResistance: 20, lightningResistance: 20 },
+    description: "+20 em todas as resistências elementais." },
+  alchemist: { name: "Alquimista", modifiers: { poisonResistance: 30, lightningResistance: 30 },
+    description: "+30 de resistência a veneno e elétrica. Habilidade de veneno em breve." }
+};
+
+// Resistances store percentage points. Elemental damage is a future mechanic.
+function initialCharacterStats(race, characterClass) {
+  const stats = { ...baseCharacterStats };
+  for (const definition of [raceDefinitions[race], classDefinitions[characterClass]]) {
+    for (const [stat, modifier] of Object.entries(definition.modifiers)) stats[stat] += modifier;
+  }
+  return { ...stats, maxHealth: stats.health, maxEnergy: stats.energy };
+}
 const targetMaxHealth = 3;
 const enemyRules = { notice: 46, loseInterest: 96, speed: 49, attackRange: 17, reach: 19,
   windup: 0.55, recovery: 0.75 };
-const enemySpawn = { radius: 6, health: targetMaxHealth, flashUntil: 0, state: "idle",
+const enemySpawn = { radius: 6, health: targetMaxHealth, strength: 1, armor: 0, flashUntil: 0, state: "idle",
   direction: Math.PI, remaining: 0 };
 let runSeed, depth, floor;
 const steps = [-columns, 1, columns, -1];
@@ -442,6 +475,29 @@ function characterSelection() {
   };
 }
 
+function characterOptions(type) {
+  return Array.from(characterCreate.querySelectorAll(`[name="${type}"]`));
+}
+
+function setCharacterOption(type, index) {
+  const options = characterOptions(type);
+  const selected = (index + options.length) % options.length;
+  options.forEach((option, i) => { option.checked = i === selected; });
+}
+
+function changeCharacterOption(type, direction) {
+  const options = characterOptions(type);
+  setCharacterOption(type, options.findIndex(option => option.checked) + direction);
+  updateCharacter();
+}
+
+function randomizeCharacter(type) {
+  for (const selector of type ? [type] : ["race", "class"]) {
+    setCharacterOption(selector, Math.floor(Math.random() * characterOptions(selector).length));
+  }
+  updateCharacter();
+}
+
 function updateCharacter() {
   const { race, characterClass } = characterSelection();
   const rows = (race.value === "human" ? humanHead : goblinHead)
@@ -462,9 +518,32 @@ function updateCharacter() {
   const preview = document.getElementById("preview");
   const inventoryPortrait = document.getElementById("inventory-portrait");
   preview.dataset.appearance = inventoryPortrait.dataset.appearance = `${race.value}-${characterClass.value}`;
-  const initialHealth = `${playerMaxHealth}/${playerMaxHealth}`;
-  document.getElementById("creation-health").textContent = initialHealth;
-  const appearance = `Raça ${race.labels[0].textContent.trim()}, classe ${characterClass.labels[0].textContent.trim()}`;
+  const existingHuman = race.value === "human" && ["adventurer","guardian"].includes(characterClass.value);
+  preview.style.backgroundImage = existingHuman ? "" :
+    `url("assets/characters/${race.value}-${characterClass.value}.webp")`;
+  preview.style.backgroundSize = existingHuman ? "" : "900% 500%";
+  inventoryPortrait.style.setProperty("--character-sheet", existingHuman ? "" :
+    `url("assets/characters/${race.value}-${characterClass.value}.webp")`);
+  if (!existingHuman) gameplayArt.prepareCharacter(race.value, characterClass.value);
+  const stats = initialCharacterStats(race.value, characterClass.value);
+  for (const stat of Object.keys(baseCharacterStats)) {
+    document.getElementById(`creation-${stat}`).textContent = stats[stat];
+  }
+  for (const [type, definitions] of [["race", raceDefinitions], ["class", classDefinitions]]) {
+    const options = characterOptions(type);
+    const index = options.findIndex(option => option.checked);
+    const definition = definitions[options[index].value];
+    for (const [suffix,offset] of [["neighbor-previous",-1],["current",0],["neighbor-next",1]]) {
+      const optionIndex = (index + offset + options.length) % options.length;
+      const button = document.getElementById(`${type}-${suffix}`);
+      button.textContent = definitions[options[optionIndex].value].name;
+      button.dataset.optionIndex = optionIndex;
+      button.setAttribute("aria-pressed", offset === 0 ? "true" : "false");
+    }
+    document.getElementById(`${type}-trait-name`).textContent = definition.name;
+    document.getElementById(`${type}-trait-description`).textContent = definition.description;
+  }
+  const appearance = `Raça ${raceDefinitions[race.value].name}, classe ${classDefinitions[characterClass.value].name}`;
   inventoryPortrait.setAttribute("aria-label", appearance);
   preview.setAttribute("aria-label", appearance);
 }
@@ -478,6 +557,12 @@ function bladePose(x, y, elapsed) {
   const cx = x + 2 * Math.cos(swing.direction);
   const cy = y - 8 + 2 * Math.sin(swing.direction);
   return { phase, sweep, angle, reach, cx, cy };
+}
+
+function calculateDamage(strength = 0, weapon = null, armor = 0) {
+  const range = weapon?.damage;
+  const weaponDamage = range ? range.min + Math.floor(Math.random() * (range.max - range.min + 1)) : 0;
+  return Math.max(0, strength + weaponDamage - armor);
 }
 
 // Keep the original sampled trail for the remaining pixel sprites.
@@ -548,7 +633,8 @@ function updateEnemy(target, now, dt) {
       const ux = Math.cos(target.direction), uy = Math.sin(target.direction);
       const along = Math.max(0, Math.min(enemyRules.reach, dx * ux + dy * uy));
       if (Math.hypot(dx - along * ux, dy - along * uy) <= radius && clearPath(target, player, 0)) {
-        player.health--;
+        const damage = calculateDamage(target.strength ?? 1, target.weapon, player.armor);
+        player.health = Math.max(0, player.health - damage);
         player.flashUntil = now + 240;
         showHealth();
         if (player.health === 0) finishRun();
@@ -646,7 +732,8 @@ function checkSwordHit(now) {
       const dx = target.x - pose.cx, dy = target.y - 8 - pose.cy;
       const along = Math.max(6, Math.min(pose.reach, dx * ux + dy * uy));
       if (Math.hypot(dx - along * ux, dy - along * uy) > target.radius || !clearPath(player, target, 0)) continue;
-      target.health--;
+      const damage = calculateDamage(player.strength, inventoryView.getEquipped("weapon"), target.armor);
+      target.health = Math.max(0, target.health - damage);
       target.flashUntil = now + 120;
       swing.hit = true;
       return;
@@ -678,6 +765,10 @@ function drawPlayer(now) {
 function drawPlayerPose(now) {
   const x = Math.round(player.x), y = Math.round(player.y);
   const flashing = now < player.flashUntil && Math.floor((player.flashUntil - now) / 60) % 2 === 1;
+  const currentBlade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
+  if (gameplayArt.character(ctx, player.x, player.y, player.race, player.characterClass,
+      swing?.direction ?? lastDirection, playerMoved, stride, flashing, currentBlade,
+      inventoryView.getEquipped("weapon"))) return;
   if (player.race === "human" && player.characterClass === "guardian") {
     const blade = swing && bladePose(x, y + Math.floor(stride / 6) % 2, now - swing.started);
     if (gameplayArt.guardian(ctx, player.x, player.y, swing?.direction ?? lastDirection,
@@ -741,18 +832,13 @@ function drawPlayerPose(now) {
 function held(first, second) { return Number(keys.has(first) || keys.has(second)); }
 
 function drawInventoryFigure() {
-  if (player.race !== "human") {
-    inventoryFigure.removeAttribute("data-rendered");
-    inventoryFigureCanvas.hidden = true;
-    return;
-  }
   const ink = inventoryFigureCanvas.getContext("2d");
   ink.resetTransform();
   ink.clearRect(0, 0, 160, 144);
   const scale = 118 / 21;
   ink.scale(scale, scale);
-  const paint = player.characterClass === "guardian" ? gameplayArt.guardian : gameplayArt.adventurer;
-  const painted = paint(ink, 80 / scale, 132 / scale, 0, false, 0, false, null,
+  const painted = gameplayArt.character(ink, 80 / scale, 132 / scale,
+    player.race, player.characterClass, 0, false, 0, false, null,
     inventoryView.getEquipped("weapon"));
   inventoryFigure.toggleAttribute("data-rendered", painted);
   inventoryFigureCanvas.hidden = !painted;
@@ -808,14 +894,14 @@ function clearSwings() {
 }
 
 function showHealth() {
-  const value = `${player.health}/${playerMaxHealth}`;
+  const value = `${player.health}/${player.maxHealth}`;
   healthDisplay.textContent = `Vida ${value}`;
   inventoryHealth.textContent = value;
 }
 
 function showCharacterSheet() {
   for (const field of inventory.querySelectorAll("[data-stat]")) {
-    field.textContent = player[field.dataset.stat];
+    field.textContent = field.dataset.stat === "energy" ? `${player.energy}/${player.maxEnergy}` : player[field.dataset.stat];
   }
   const spells = document.getElementById("inventory-spells");
   spells.replaceChildren(...player.spells.map(name => {
@@ -832,6 +918,7 @@ function finishRun() {
   keys.clear();
   clearSwings();
   if (inventory.open) inventory.close();
+  if (itemCatalogDialog.open) itemCatalogDialog.close();
   end.hidden = false;
   reset.focus();
 }
@@ -852,6 +939,13 @@ sellDropzone.addEventListener("drop", event => event.preventDefault());
 
 window.addEventListener("keydown", event => {
   if (game.hidden || player.finished || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (itemCatalogDialog.open && event.target?.closest?.("#item-catalog")) {
+    if (event.code === "Escape") {
+      event.preventDefault();
+      itemCatalogDialog.close();
+    }
+    return;
+  }
   if (event.code === "KeyI") {
     event.preventDefault();
     if (!inventory.open && !event.repeat) {
@@ -863,6 +957,11 @@ window.addEventListener("keydown", event => {
   if (event.code === "Escape" && inventory.open) {
     event.preventDefault();
     inventory.close();
+    return;
+  }
+  if (event.code === "Escape" && itemCatalogDialog.open) {
+    event.preventDefault();
+    itemCatalogDialog.close();
     return;
   }
   if (event.code === "Space") {
@@ -896,15 +995,15 @@ function enterFloor(number) {
 }
 
 function startRun() {
+  if (itemCatalogDialog.open) itemCatalogDialog.close();
   characterCreate.hidden = true;
   game.hidden = false;
   runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
   const { race, characterClass } = characterSelection();
   player = {
     race: race.value, characterClass: characterClass.value,
-    health: playerMaxHealth, finished: false, level: 1, xp: 0, manaPearls: 0, spells: [],
-    magic: 0, armor: 0, strength: 0, stamina: 0, willpower: 0, intellect: 0,
-    fireResistance: 0, iceResistance: 0, poisonResistance: 0, lightningResistance: 0
+    ...initialCharacterStats(race.value, characterClass.value),
+    finished: false, level: 1, xp: 0, manaPearls: 0, spells: []
   };
   inventoryView.reset();
   gameTime = 0;
@@ -917,6 +1016,7 @@ function startRun() {
 }
 
 function showMenu() {
+  if (itemCatalogDialog.open) itemCatalogDialog.close();
   game.hidden = true;
   characterCreate.hidden = true;
   menu.hidden = false;
@@ -924,14 +1024,66 @@ function showMenu() {
 }
 
 play.addEventListener("click", () => {
+  randomizeCharacter();
   menu.hidden = true;
   characterCreate.hidden = false;
   document.getElementById("character-title").focus();
 });
 characterCreate.addEventListener("change", updateCharacter);
+for (const type of ["race", "class"]) {
+  document.getElementById(`${type}-previous`).addEventListener("click", () => changeCharacterOption(type, -1));
+  document.getElementById(`${type}-next`).addEventListener("click", () => changeCharacterOption(type, 1));
+  document.getElementById(`${type}-random`).addEventListener("click", () => randomizeCharacter(type));
+  for (const suffix of ["neighbor-previous", "current", "neighbor-next"]) {
+    const button = document.getElementById(`${type}-${suffix}`);
+    button.addEventListener("click", () => {
+      setCharacterOption(type, Number(button.dataset.optionIndex));
+      updateCharacter();
+    });
+  }
+}
 document.getElementById("back-character").addEventListener("click", showMenu);
 document.getElementById("start").addEventListener("click", startRun);
 reset.addEventListener("click", startRun);
 document.getElementById("back-menu").addEventListener("click", showMenu);
 document.getElementById("help").addEventListener("click", () => instructions.showModal());
 updateCharacter();
+
+const itemCatalogDialog = document.getElementById("item-catalog");
+const catalogFeedback = document.getElementById("catalog-feedback");
+document.getElementById("clear-test-bag").addEventListener("click", () => {
+  inventoryView.clearBag();
+  catalogFeedback.textContent = "Mochila vazia. Os itens equipados continuam disponíveis.";
+});
+document.getElementById("open-item-catalog").addEventListener("click", () => {
+  if (player.finished) return;
+  keys.clear();
+  catalogFeedback.textContent = "";
+  itemCatalogDialog.show();
+});
+itemCatalogDialog.addEventListener("close", () => canvas.focus());
+const categoryNames = {weapon:"Armas",head:"Elmos",armor:"Armaduras",boots:"Botas",necklace:"Colares",ring:"Anéis"};
+for (const [category,label] of Object.entries(categoryNames)) {
+  const section = document.createElement("section");
+  const title = document.createElement("h3");
+  title.textContent = label;
+  const grid = document.createElement("div");
+  grid.className = "catalog-grid";
+  for (const item of itemCatalog.filter(item => item.category === category)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    const icon = document.createElement("img");
+    icon.src = item.icon;
+    icon.alt = "";
+    const name = document.createElement("span");
+    name.textContent = item.name;
+    button.append(icon, name);
+    button.addEventListener("click", () => {
+      catalogFeedback.textContent = inventoryView.addItem(item)
+        ? `${item.name} adicionado à mochila.` : "Mochila cheia. Libere um espaço para adicionar o item.";
+    });
+    grid.append(button);
+  }
+  section.append(title, grid);
+  document.getElementById("catalog-groups").append(section);
+}

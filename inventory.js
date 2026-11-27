@@ -1,32 +1,57 @@
 "use strict";
 
-// Item icons are sampled individually from the approved artwork.
-const referenceIconColumns = [662, 783, 903, 1023, 1143, 1259];
-const referenceIconRows = [302, 423, 543];
-const inventoryCatalog = [
-  ["head", "Elmo com viseira", "Elmo de chifres", "Capuz em runas"],
-  ["weapon", "Espada de guarda reta", "Sabre de lâmina curva", "Espada de cristal"],
-  ["armor", "Peitoral de placas", "Gibão de couro", "Couraça laminada"],
-  ["necklace", "Presa em cordão", "Medalhão solar", "Pingente de jade"],
-  ["boots", "Botas de montaria", "Botas de placas", "Botas de tecido"],
-  ["ring", "Sinete de bronze", "Aro de espinhos", "Anel de jade"]
-].flatMap(([category, ...names], row) => names.map((name, column) => {
-  if (category === "weapon" && column === 0) return gameItems.shortSword;
-  const x = referenceIconColumns[(row % 2) * 3 + column];
-  const y = referenceIconRows[Math.floor(row / 2)];
-  return {
-    category, name,
-    iconPosition: `${column * 50}% ${row * 20}%`,
-    referenceIconPosition: `${100 * x / (1536 - 96)}% ${100 * y / (1024 - 96)}%`
-  };
-})).concat(Object.values(gameItems).filter(item => item !== gameItems.shortSword));
+const inventoryCatalog = ["head", "weapon", "armor", "necklace", "boots", "ring"]
+  .flatMap(category => itemCatalog.filter(item => item.category === category).slice(0, 3))
+  .concat(gameItems.spear);
 
 function createInventoryView(dialog) {
   const bagGrid = dialog.querySelector("#bag-slots");
   const feedback = dialog.querySelector("#inventory-feedback");
+  const tooltip = document.getElementById("item-tooltip");
+  const tooltipArt = document.getElementById("item-tooltip-art");
+  const tooltipName = document.getElementById("item-tooltip-name");
+  const tooltipStats = document.getElementById("item-tooltip-stats");
   const slotsByButton = new WeakMap();
   let selected = null;
   let drag = null;
+  let inspected = null;
+
+  function hideTooltip() {
+    inspected?.button.removeAttribute("aria-describedby");
+    inspected = null;
+    tooltip.hidden = true;
+  }
+
+  function positionTooltip() {
+    if (!inspected || tooltip.hidden) return;
+    const slot = inspected.button.getBoundingClientRect();
+    const popup = tooltip.getBoundingClientRect();
+    const width = document.documentElement.clientWidth;
+    const height = document.documentElement.clientHeight;
+    const right = slot.right + 12;
+    const left = right + popup.width <= width - 8 ? right : slot.left - popup.width - 12;
+    tooltip.style.left = `${Math.max(8, Math.min(left, width - popup.width - 8))}px`;
+    tooltip.style.top = `${Math.max(8, Math.min(slot.top, height - popup.height - 8))}px`;
+  }
+
+  function showTooltip(slot) {
+    hideTooltip();
+    if (!dialog.open || drag || !slot.item) return;
+    const { item } = slot;
+    const icon = slot.icon.cloneNode(true);
+    icon.className = "item-tooltip-icon";
+    icon.style.rotate = "";
+    icon.style.maskImage = "none";
+    icon.style.width = item.category === "weapon" ? "140px" : "86px";
+    tooltipArt.replaceChildren(icon);
+    tooltipName.textContent = item.name;
+    tooltipStats.textContent = item.damage ? `Dano ${item.damage.min}–${item.damage.max}` : "";
+    tooltipStats.hidden = !item.damage;
+    inspected = slot;
+    slot.button.setAttribute("aria-describedby", tooltip.id);
+    tooltip.hidden = false;
+    positionTooltip();
+  }
 
   function register(button, label, category = null, initialItem = null) {
     const icon = document.createElement("span");
@@ -38,6 +63,14 @@ function createInventoryView(dialog) {
       if (event.detail === 0) activate(slot);
     });
     button.addEventListener("pointerdown", event => beginDrag(event, slot));
+    button.addEventListener("pointerenter", () => showTooltip(slot));
+    button.addEventListener("pointerleave", () => {
+      if (inspected === slot && document.activeElement !== button) hideTooltip();
+    });
+    button.addEventListener("focus", () => showTooltip(slot));
+    button.addEventListener("blur", () => {
+      if (inspected === slot) hideTooltip();
+    });
     return slot;
   }
 
@@ -60,12 +93,13 @@ function createInventoryView(dialog) {
     button.setAttribute("aria-label", `${label}: ${item ? item.name : "vazio"}`);
     button.setAttribute("aria-pressed", String(slot === selected));
     button.toggleAttribute("data-occupied", Boolean(item));
-    button.title = item ? item.name : label;
+    if (item) button.removeAttribute("title");
+    else button.title = label;
     if (item) {
       icon.className = "inventory-icon";
       icon.style.background = item.icon ? `url("${item.icon}") center / contain no-repeat` : "";
       icon.style.maskImage = item.icon ? "none" : "";
-      icon.style.rotate = item.icon ? "-45deg" : "";
+    icon.style.rotate = item.category === "weapon" ? "-45deg" : "";
       icon.style.setProperty("--painted-icon-position", item.iconPosition ?? "0% 0%");
       icon.style.setProperty("--reference-icon-position", item.referenceIconPosition ?? "0% 0%");
       button.replaceChildren(icon);
@@ -99,6 +133,7 @@ function createInventoryView(dialog) {
       return false;
     }
     const item = source.item;
+    hideTooltip();
     // A swapped item goes back to the exact slot vacated by the moving item.
     source.item = target.item;
     target.item = item;
@@ -127,8 +162,10 @@ function createInventoryView(dialog) {
   function beginDrag(event, source) {
     if (drag || !dialog.open || !source.item || !event.isPrimary || event.button !== 0) return;
     const { pointerId, clientX: x, clientY: y } = event;
+    hideTooltip();
     source.button.setPointerCapture(pointerId);
     drag = { source, pointerId, startX: x, startY: y, x, y, ghost: null, target: null };
+    document.documentElement.classList.add("holding-item");
   }
 
   function slotAt(x, y) {
@@ -170,6 +207,7 @@ function createInventoryView(dialog) {
     if (!drag) return;
     const { source, ghost, target, pointerId } = drag;
     drag = null;
+    document.documentElement.classList.remove("holding-item");
     source.button.classList.remove("inventory-drag-source");
     target?.button.classList.remove("inventory-drop-target");
     ghost?.remove();
@@ -189,18 +227,41 @@ function createInventoryView(dialog) {
       if (drag?.pointerId === event.pointerId) clearDrag();
     });
   }
-  window.addEventListener("blur", clearDrag);
+  window.addEventListener("blur", () => {
+    clearDrag();
+    hideTooltip();
+  });
+  window.addEventListener("resize", positionTooltip);
+  window.addEventListener("scroll", hideTooltip, true);
   dialog.addEventListener("close", () => {
     clearDrag();
+    hideTooltip();
     select(null);
     feedback.textContent = "";
   });
   return {
+    clearBag() {
+      clearDrag();
+      hideTooltip();
+      select(null);
+      for (const slot of bag) {
+        slot.item = null;
+        draw(slot);
+      }
+    },
+    addItem(item) {
+      const slot = bag.find(slot => !slot.item);
+      if (!slot) return false;
+      slot.item = item;
+      draw(slot);
+      return true;
+    },
     getEquipped(category) {
       return equipment.find(slot => slot.category === category)?.item ?? null;
     },
     reset() {
       clearDrag();
+      hideTooltip();
       select(null);
       for (const slot of [...equipment, ...bag]) {
         slot.item = slot.initialItem;

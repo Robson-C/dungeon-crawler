@@ -130,3 +130,38 @@ TOP RIGHT: a second matching seamless floor swatch, same average hue, brightness
 BOTTOM LEFT: straight orthographic front-facing wall material filling the quadrant. TOP QUARTER is a flat broad coping surface of the same stone, continuous and quiet. BOTTOM THREE QUARTERS are the wall's vertical masonry, two rows of broad blocks. Compatible with horizontal repeat, no skew or isometric angle.
 BOTTOM RIGHT: square downward stair opening with 5 broad steps descending north into shadow, viewed as a slightly elevated top-down RPG sprite. A restrained matching masonry rim, opening centered, fills 88 percent of cell. A little of the floor material surrounds it. No gold ornamental corners. All four quadrants completely opaque, flush to each edge. No text, UI, labels, torches, props, characters, decoration, large crevices, vegetation clumps or mockup of a room.
 MATERIAL DIRECTION: UNDERGROUND EARTH AND SPARSE EMBEDDED FLAT STONES. The floor is predominantly quiet compacted matte earth, medium dark desaturated umber with muted olive-gray shadows, gently broad brushed continuous ground, not a stone pavement. Only two or three widely separated flush half-buried flat stones in a whole floor swatch, low contrast with the earth; stones occupy under 15 percent of the floor. No gravel speckle, roots, grass tufts, holes or scattered items. Second floor swatch has a faint warmer compacted soil patch and one sparse flat stone. Earth edge tiling must be seamless. Walls are substantial cool brown-gray natural rock blocks with softly hand-hewn faces and very restrained muted moss in a few mortar seams. Coping is flat worn rock. Staircase is weathered gray-brown rock.
+
+## Sabre e espada de cristal — 27/11/2026
+
+O usuário confirmou o nome visível Espada de guarda reta para o item inicial. A chave shortSword, o id short-sword e o arquivo short-sword.png continuam identificando esse item nos dados existentes.
+
+Os dois desenhos novos foram produzidos pelo imagegen integrado, usando o recorte de cada ícone de inventory-items-painted.png e o sprite short-sword.png como referências. O sabre tem guarda dourada com proteção do punho e lâmina crescente. A espada de cristal tem cabo roxo, guarda metálica e lâmina verde facetada.
+
+| Arquivo | Resolução | Registro |
+| --- | --- | --- |
+| sabre-curved.png | 256 × 160 | Cabo em (40,80), lâmina para a direita |
+| crystal-sword.png | 256 × 160 | Cabo em (40,80), lâmina para a direita |
+
+A preparação dos sprites preserva a transparência e redimensiona cada resultado para 254 × 159. O recorte remove três colunas transparentes à esquerda e acrescenta cinco à direita. No sabre, remove dez linhas transparentes acima e completa a margem inferior. O ponto de apoio fica na região de couro de cada cabo. A preparação usa Sharp.
+
+items.js define curvedSabre e crystalSword com nome, id, ícone e weaponSprite. inventory.js liga as três entradas da categoria arma às definições correspondentes. Cada arma aparece uma vez no catálogo, e o primeiro item começa equipado. O motor existente aplica a arma escolhida às poses de repouso, movimento e golpe e ao retrato do inventário.
+
+### Prompts utilizados
+
+Sabre
+
+> Production game weapon sprite for Chaos Crawl. Input image 1 is the existing item, preserve its individual design. Input image 2 is the in-game rendering style and HORIZONTAL POSE reference. Render ONE isolated whole weapon with TRUE TRANSPARENT BACKGROUND. Wide landscape 8:5 format. Weapon lies precisely horizontally with POMMEL ON LEFT and blade tip pointing RIGHT. Center of handle grip at about x=16% of canvas, y=50%. Guard at x=26%, blade ends x=96%. Fit with narrow safe margins and do not crop. Painterly cartoon fantasy matching image 2's simplified broad shading and dark crisp silhouette, readable at 40px on screen. No hand, floor, cast shadow, background, text or motion blur. No need for rotation frames, this is a single rigid sword whose handle will be attached to existing animation. Turn the curved saber from input 1 clockwise into horizontal. Dark brown leather grip, gold round pommel, brass guard with a distinct D-shaped knuckle bow below handle, wide sweeping worn steel crescent blade bending UPWARD with its tip to the RIGHT. Preserve its pronounced curved profile, no straightening of blade. Keep handle axis horizontal and grip on center height, with the hooked tip above the axis.
+
+Espada de cristal
+
+> Production game weapon sprite for Chaos Crawl. Input image 1 is the existing item, preserve its individual design. Input image 2 is the in-game rendering style and HORIZONTAL POSE reference. Render ONE isolated whole weapon with TRUE TRANSPARENT BACKGROUND. Wide landscape 8:5 format. Weapon lies precisely horizontally with POMMEL ON LEFT and blade tip pointing RIGHT. Center of handle grip at about x=16% of canvas, y=50%. Guard at x=26%, blade ends x=96%. Fit with narrow safe margins and do not crop. Painterly cartoon fantasy matching image 2's simplified broad shading and dark crisp silhouette, readable at 40px on screen. No hand, floor, cast shadow, background, text or motion blur. No need for rotation frames, this is a single rigid sword whose handle will be attached to existing animation. Turn the emerald crystal sword from input 1 clockwise into horizontal. Deep purple wrapped grip, small dark-silver angular pommel with pale purple gem, dark charcoal-silver straight crossguard, broad tapered green crystal blade ending in a sharp point on RIGHT. Clear asymmetric emerald facets, pale jade glint, darker green on underside. Crisp solid silhouette, no aura, no magic particle glow. Keep grip and point on the same horizontal center line.
+
+### Validação desta integração
+
+O teste local ../../validacao-armas-iniciais.cjs executou os scripts atuais do jogo com DOM simulado e Canvas Skia. Conferiu 768 desenhos combinando três armas, quatro aparências, oito direções, corrida e repouso e três fases do ataque. Também acionou 32 ataques pelo loop real com as teclas de movimento e Espaço, soltando o movimento durante o golpe. O tempo de ataque terminou em 300 ms, e o deslocamento durante 200 ms de corrida foi de 14,4 unidades.
+
+O arraste exercitou troca, rejeição por categoria, desequipamento, retorno à mochila e reinício. Os ícones e o retrato usaram a arma equipada. Cada definição aparece uma vez no catálogo. As imagens finais têm transparência e o ponto (40,80) fica dentro do cabo.
+
+A prévia ../../previa-armas-iniciais.png compara as três armas nos dois humanos. A prévia ../../previa-sabre-cristal.gif mostra as duas armas novas nas oito direções. O GIF foi medido em 3,2 segundos. Foram inspecionados quadros da animação no mapa. A validação usa rasterização local. A avaliação interativa no navegador fica pendente.
+
+O backup ../../backup-antes-sabre-cristal contém items.js, inventory.js e esta documentação antes da mudança. Para reverter, restaurar esses três arquivos e retirar sabre-curved.png e crystal-sword.png. O popup de atributos ao passar o mouse é a próxima etapa solicitada.

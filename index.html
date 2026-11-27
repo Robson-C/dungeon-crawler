@@ -26,31 +26,75 @@
     <section id="character-create" aria-labelledby="character-title" hidden>
       <img class="creation-art" src="assets/chaos-crawl-creation.png" width="1659" height="948" alt="" draggable="false">
       <h2 id="character-title" class="creation-accessible" tabindex="-1">Criar personagem</h2>
-      <dl class="creation-accessible" aria-label="Atributos iniciais">
-        <dt>Vida</dt><dd id="creation-health"></dd>
-        <dt>Magia</dt><dd>0</dd>
-        <dt>Armadura</dt><dd>0</dd>
-        <dt>Força</dt><dd>0</dd>
-        <dt>Vigor</dt><dd>0</dd>
-        <dt>Vontade</dt><dd>0</dd>
-        <dt>Intelecto</dt><dd>0</dd>
-        <dt>Resistência a fogo</dt><dd>0</dd>
-        <dt>Resistência a gelo</dt><dd>0</dd>
-        <dt>Resistência a veneno</dt><dd>0</dd>
-        <dt>Resistência elétrica</dt><dd>0</dd>
-      </dl>
+      <section class="creation-stat-panel" aria-label="Atributos iniciais">
+        <dl class="creation-primary-stats">
+          <div><dt>Vida</dt><dd id="creation-health"></dd></div>
+          <div><dt>Energia</dt><dd id="creation-energy"></dd></div>
+          <div><dt>Armadura</dt><dd id="creation-armor"></dd></div>
+          <div><dt>Força</dt><dd id="creation-strength"></dd></div>
+          <div><dt>Vigor</dt><dd id="creation-stamina"></dd></div>
+          <div><dt>Vontade</dt><dd id="creation-willpower"></dd></div>
+          <div><dt>Intelecto</dt><dd id="creation-intellect"></dd></div>
+        </dl>
+        <dl class="creation-resistances" aria-label="Resistências elementais">
+          <div class="fire"><dt>Fogo</dt><dd id="creation-fireResistance"></dd></div>
+          <div class="ice"><dt>Gelo</dt><dd id="creation-iceResistance"></dd></div>
+          <div class="poison"><dt>Veneno</dt><dd id="creation-poisonResistance"></dd></div>
+          <div class="lightning"><dt>Elétrica</dt><dd id="creation-lightningResistance"></dd></div>
+        </dl>
+      </section>
+      <aside class="creation-traits" aria-label="Vantagens da raça e classe" aria-live="polite" aria-atomic="true">
+        <h3 id="race-trait-name"></h3>
+        <p id="race-trait-description"></p>
+        <h3 id="class-trait-name"></h3>
+        <p id="class-trait-description"></p>
+      </aside>
       <p class="creation-accessible">Títulos: 12 espaços bloqueados.</p>
       <div class="customize">
         <div id="preview" class="character-art" data-appearance="human-adventurer" role="img" aria-label="Prévia do personagem"></div>
         <fieldset class="creation-race">
           <legend>Raça</legend>
-          <label><input type="radio" name="race" value="human" checked><span>Humana</span></label>
-          <label><input type="radio" name="race" value="goblin"><span>Goblin</span></label>
+          <div class="selector-row">
+            <span class="selector-label" aria-hidden="true">Raça</span>
+            <button type="button" id="race-previous" class="selector-arrow" aria-label="Raça anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg></button>
+            <div class="selector-names">
+              <button type="button" id="race-neighbor-previous" class="selector-option" aria-pressed="false"></button>
+              <button type="button" id="race-current" class="selector-option" aria-pressed="true"></button>
+              <button type="button" id="race-neighbor-next" class="selector-option" aria-pressed="false"></button>
+            </div>
+            <button type="button" id="race-next" class="selector-arrow" aria-label="Próxima raça"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+            <button type="button" id="race-random" class="selector-dice" aria-label="Sortear raça" title="Sortear raça">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="7.5" cy="7.5" r="1.5"/><circle cx="16.5" cy="7.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="7.5" cy="16.5" r="1.5"/><circle cx="16.5" cy="16.5" r="1.5"/></svg>
+            </button>
+          </div>
+          <div hidden>
+            <label><input type="radio" name="race" value="human" checked>Humano</label>
+            <label><input type="radio" name="race" value="goblin">Goblin</label>
+            <label><input type="radio" name="race" value="skeleton">Esqueleto</label>
+            <label><input type="radio" name="race" value="draconic">Dracônico</label>
+          </div>
         </fieldset>
         <fieldset class="creation-class">
           <legend>Classe</legend>
-          <label><input type="radio" name="class" value="adventurer" checked><span>Aventureiro</span></label>
-          <label><input type="radio" name="class" value="guardian"><span>Guardião</span></label>
+          <div class="selector-row">
+            <span class="selector-label" aria-hidden="true">Classe</span>
+            <button type="button" id="class-previous" class="selector-arrow" aria-label="Classe anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg></button>
+            <div class="selector-names">
+              <button type="button" id="class-neighbor-previous" class="selector-option" aria-pressed="false"></button>
+              <button type="button" id="class-current" class="selector-option" aria-pressed="true"></button>
+              <button type="button" id="class-neighbor-next" class="selector-option" aria-pressed="false"></button>
+            </div>
+            <button type="button" id="class-next" class="selector-arrow" aria-label="Próxima classe"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+            <button type="button" id="class-random" class="selector-dice" aria-label="Sortear classe" title="Sortear classe">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="7.5" cy="7.5" r="1.5"/><circle cx="16.5" cy="7.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="7.5" cy="16.5" r="1.5"/><circle cx="16.5" cy="16.5" r="1.5"/></svg>
+            </button>
+          </div>
+          <div hidden>
+            <label><input type="radio" name="class" value="adventurer" checked>Aventureiro</label>
+            <label><input type="radio" name="class" value="guardian">Guardião</label>
+            <label><input type="radio" name="class" value="elementalist">Elementalista</label>
+            <label><input type="radio" name="class" value="alchemist">Alquimista</label>
+          </div>
         </fieldset>
       </div>
       <div class="character-actions">
@@ -61,7 +105,7 @@
     <dialog id="instructions" aria-labelledby="help-title">
       <h2 id="help-title">Como jogar</h2>
       <p>Use <kbd>WASD</kbd> ou as <kbd>setas</kbd> para andar. Aperte <kbd>Espaço</kbd> para atacar na direção do movimento.</p>
-      <p>Quando o inimigo levantar a lança, recue. Você começa com três pontos de vida.</p>
+      <p>Quando o inimigo levantar a lança, recue. A vida inicial depende da raça e classe escolhidas.</p>
       <p>Explore as salas e pise na escada para descer. Você pode deixar inimigos para trás.</p>
       <p>Aperte <kbd>I</kbd> para abrir o inventário. Pressione <kbd>Esc</kbd> ou clique fora para fechar. Os inimigos continuam ativos.</p>
       <form method="dialog"><button>Voltar</button></form>
@@ -110,7 +154,7 @@
             </dl>
             <dl class="stat-list">
               <div><dt>Vida</dt><dd id="inventory-health"></dd></div>
-              <div><dt>Magia</dt><dd data-stat="magic"></dd></div>
+              <div><dt>Energia</dt><dd data-stat="energy"></dd></div>
               <div><dt>Armadura</dt><dd data-stat="armor"></dd></div>
               <div><dt>Força</dt><dd data-stat="strength"></dd></div>
               <div><dt>Vigor</dt><dd data-stat="stamina"></dd></div>
@@ -149,9 +193,25 @@
     </section>
     <footer>
       <span><b class="compass" aria-hidden="true">◇</b> Alcance a escada</span>
+      <button type="button" id="open-item-catalog">Catálogo de teste</button>
       <span class="controls"><kbd>WASD</kbd> ou <kbd>↑ ← ↓ →</kbd> para mover · <kbd>Espaço</kbd> para atacar · <kbd>I</kbd> Inventário</span>
     </footer>
     </div>
   </main>
+  <dialog id="item-catalog" aria-labelledby="item-catalog-title">
+    <form method="dialog" class="catalog-header">
+      <h2 id="item-catalog-title">Catálogo de teste</h2>
+      <button type="submit">Fechar</button>
+    </form>
+    <p>Escolha um item para adicionar à mochila.</p>
+    <button type="button" id="clear-test-bag">Esvaziar mochila de teste</button>
+    <p id="catalog-feedback" role="status"></p>
+    <div id="catalog-groups"></div>
+  </dialog>
+  <div id="item-tooltip" role="tooltip" hidden>
+    <div id="item-tooltip-art" aria-hidden="true"></div>
+    <strong id="item-tooltip-name"></strong>
+    <p id="item-tooltip-stats"></p>
+  </div>
 </body>
 </html>

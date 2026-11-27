@@ -41,3 +41,13 @@ Os testes no Chrome verificaram as seis silhuetas, arraste de elmo e arma nos do
 A imagem `assets/chaos-crawl-creation.png` foi a referência de estilo.
 
 > Create an original, directly usable game inventory panel frame for Chaos Crawl. Image 1 is the existing character-creation screen, provided only as a style reference. Match its illustrated dark fantasy stone plaques, worn brown-charcoal rock, restrained warm bronze/gold highlights, carved bevels, and dramatic yet subtle material detail. Produce one wide 3:2 rectangular 2D frame, perfectly straight front view, flat orthographic UI asset for CSS nine-slice scaling. Center the rectangle on canvas with about 3 percent transparent margin on each side. Four straight continuous edges of consistent modest thickness, about 7 percent of image height, slightly chamfered carved corners. Small warm brass inlays are concentrated only in the corners, straight border spans should be comparatively simple and suitable for stretching. The middle must be entirely empty and genuinely transparent, the exterior transparent too. Keep all stone fully opaque. No text, letters, symbols, icons, characters, slots, screen mockup, background scenery, drop shadows or flare. Present a single isolated rectangular border, almost filling the image.
+
+## Popup dos itens e dano inicial — 27/11/2026
+
+O inventário mostra um popup ao apontar para um item ocupado ou focar o espaço pelo teclado. O painel usa a moldura e a textura existentes do inventário, com ícone, nome e a linha Dano 1–2 para as armas. Espada de guarda reta, sabre, espada de cristal e lança usam o intervalo definido em items.js. Os outros itens apresentam ícone e nome.
+
+O painel fica junto ao slot, com coordenadas fixas no corpo da página e posição limitada à janela. Nas bordas ele pode aparecer à esquerda ou mais acima. A largura acompanha janelas estreitas. O arraste, a troca, o fechamento do inventário, a perda de foco da janela e a rolagem fecham o popup. Os itens usam aria-describedby para vincular o conteúdo ao espaço focado. O título nativo foi substituído pelo painel nos espaços ocupados.
+
+O teste local ../../validacao-popup-dano.cjs conferiu todos os espaços ocupados, nome, ícone e intervalo de dano, foco pelo teclado, espaços vazios, troca, cancelamento de arraste, fechamento, perda de foco, rolagem e reposicionamento. Os limites de posição usaram retângulos e dimensões de janela simulados. A conferência visual interativa está pendente porque o navegador interno informou indisponibilidade neste chat. O teste também cobre a regra de dano e os fluxos de morte e reinício.
+
+O backup ../../backup-antes-popup-dano guarda os arquivos anteriores desta etapa. Os demais elementos do inventário seguem o fluxo já existente.
