@@ -23,3 +23,5 @@ O usuário autorizou em 27/11/2026 três conversas no mesmo projeto e repositór
 - O usuário autorizou um commit exclusivamente local da base atual para iniciar as três frentes. Isso não autoriza push ou publicação de trabalho futuro.
 - Não executar merges, rebase, reset destrutivo, limpeza de arquivos ou troca de branch nas outras worktrees por iniciativa própria. Integração de funcionalidade e publicação exigem escopo próprio aprovado pelo usuário.
 - Enviar ao remoto somente uma versão completa, revista e validada dentro do fluxo de aprovação já existente.
+- A conversa Principal centraliza a integração. Quando o usuário pedir importar, conferir as Frentes 2 e 3 e integrar na própria worktree da Principal, preservando as cópias de origem.
+- Quando o usuário pedir subir ao GitHub, esse pedido autoriza primeiro conferir e integrar as mudanças concluídas das Frentes 2 e 3, revisar e testar o conjunto e só então publicar. Não solicitar novamente a autorização desse fluxo já definido. Conflitos de intenção, dúvidas ou trabalho incompleto exigem esclarecimento antes do envio; não excluir silenciosamente uma frente pendente para publicar uma versão parcial.

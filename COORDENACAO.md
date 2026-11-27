@@ -28,6 +28,12 @@ Para testar uma frente, abrir o index.html da pasta correspondente. A janela que
 
 As três conversas não publicam automaticamente no GitHub. O commit inicial e o registro de coordenação são locais. A criação das cópias não autoriza implementar funcionalidades, usar subagentes, enviar mensagens entre conversas por iniciativa própria ou controlar o PC.
 
+## Integração e publicação pela Principal
+
+Regra definida pelo usuário em 27/11/2026. Esta conversa é a Principal. Quando o usuário solicitar integração, a Principal verifica as Frentes 2 e 3 e importa as mudanças concluídas na sua própria worktree. Quando solicitar subir ao GitHub, o pedido inclui conferir e reunir o trabalho das três frentes antes do envio, revisar conflitos e executar os testes pertinentes do conjunto.
+
+Esse pedido dispensa nova confirmação para repetir as etapas já autorizadas de conferência, integração e publicação. Se houver trabalho incompleto, conflito de intenção ou dúvida sobre uma alteração, a Principal deve perguntar ao usuário e aguardar antes de publicar. Não publicar uma versão parcial omitindo silenciosamente mudanças de uma das frentes. Nenhum arquivo das worktrees de origem será sobrescrito como forma de integração.
+
 ## Validação da organização
 
 O teste completo da cópia original passou em 65 itens, 16 combinações e 15.360 desenhos antes de registrar a base. Em cada uma das três worktrees passaram validation/criacao-atributos.cjs, validation/popup-dano.cjs e validation/seletores-cursor.cjs.
